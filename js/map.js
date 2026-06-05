@@ -8,16 +8,11 @@ let googleMarkers = [];
 let googlePolyline;
 let googleInfoWindows = [];
 
+=======
 // Stockage des marqueurs et info windows
 const markerStore = new Map();
 
-// Callback pour l'API Google Maps
-function initGoogleMapsAPI() {
-    console.log('Google Maps API chargée avec succès');
-    // L'initialisation de la carte se fera dans initMap()
-}
-
-// ============================================
+// ========================================================================================
 // FONCTIONS DE CARTE GOOGLE MAPS
 // ============================================
 
