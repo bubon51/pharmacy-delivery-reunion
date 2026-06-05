@@ -1,31 +1,3 @@
-// APPLICATION PRINCIPALE
-// ============================================
-
-// Variables globales
-window.orders = loadOrders() || [];
-window.pendingGPSOrder = null;
-window.pendingClosestAddress = null;
-
-// ============================================
-// INITIALISATION
-// ============================================
-
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialiser la carte (sera appelée quand Google Maps API sera prête)
-    const initApp = () => {
-        initMap();
-        renderOrders();
-        setupEventListeners();
-        
-        // Initialiser les optimisations mobiles
-        if (isMobileDevice()) {
-            setupMobileOptimizations();
-        }
-        
-        // Mettre à jour la date de dernière mise à jour
-        updateLastUpdatedDate();
-    };
-=======
 // ============================================
 // APPLICATION PRINCIPALE
 // ============================================
@@ -44,74 +16,23 @@ document.addEventListener('DOMContentLoaded', () => {
     window.orders = loadOrders() || [];
     console.log('Commandes chargées:', window.orders);
     
-    // Initialiser la carte (sera appelée quand Google Maps API sera prête)
-    const initApp = () => {
-        initMap();
-        renderOrders();
-        setupEventListeners();
-        
-        // Initialiser les optimisations mobiles
-        if (isMobileDevice()) {
-            setupMobileOptimizations();
-        }
-        
-        // Mettre à jour la date de dernière mise à jour
-        updateLastUpdatedDate();
-    };============================================
-// APPLICATION PRINCIPALE
-// ============================================
-
-// Variables globales
-window.orders = loadOrders() || [];
-window.pendingGPSOrder = null;
-window.pendingClosestAddress = null;
-
-// ============================================
-// INITIALISATION
-// ============================================
-
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialiser la carte (sera appelée quand Google Maps API sera prête)
-    const initApp = () => {
-        initMap();
-        renderOrders();
-        setupEventListeners();
-        
-        // Initialiser les optimisations mobiles
-        if (isMobileDevice()) {
-            setupMobileOptimizations();
-        }
-        
-        // Mettre à jour la date de dernière mise à jour
-        updateLastUpdatedDate();
-    };
+    // Initialiser l'application (sans la carte, qui sera initialisée par le callback Google Maps)
+    renderOrders();
+    setupEventListeners();
     
-    // Initialiser l'application même si Google Maps n'est pas encore chargé
-    // La carte sera initialisée quand l'API sera prête
-    initApp();
+    // Initialiser les optimisations mobiles
+    if (isMobileDevice()) {
+        setupMobileOptimizations();
+    }
     
-    // Si Google Maps API est déjà chargée, initialiser la carte maintenant
+    // Mettre à jour la date de dernière mise à jour
+    updateLastUpdatedDate();
+    
+    // Vérifier si Google Maps est déjà chargé (pour le développement local)
     if (typeof google !== 'undefined' && google.maps) {
+        console.log('Google Maps déjà chargé, initialisation de la carte');
         initMap();
         updateMap();
-    } else {
-        // Sinon, attendre que l'API soit chargée
-        const checkGoogleMaps = setInterval(() => {
-            if (typeof google !== 'undefined' && google.maps) {
-                clearInterval(checkGoogleMaps);
-                initMap();
-                updateMap();
-            }
-        }, 100);
-        
-        // Timeout de sécurité après 10 secondes
-        setTimeout(() => {
-            clearInterval(checkGoogleMaps);
-            if (typeof google === 'undefined' || !google.maps) {
-                console.error('Google Maps API non chargée après 10 secondes');
-                showError('Impossible de charger Google Maps. La carte ne s\'affichera pas, mais vous pouvez toujours ajouter des commandes.');
-            }
-        }, 10000);
     }
 });
 
