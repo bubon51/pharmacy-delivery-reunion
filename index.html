@@ -104,7 +104,25 @@
             #map { height: 400px; }
             .route-steps { position: relative; margin-top: 20px; }
         }
-    </style>
+    
+        /* Style pour la modal GPS */
+        #manualGPSModal .modal-header {
+            background-color: #17a2b8;
+        }
+        #manualGPSModal .btn-close {
+            filter: brightness(0) invert(1);
+        }
+        #gpsCoordinates {
+            font-family: monospace;
+        }
+        .btn-waze-search {
+            background-color: #0073ff;
+            color: white;
+        }
+        .btn-waze-search:hover {
+            background-color: #0056d3;
+        }
+</style>
 </head>
 <body>
     <div class="container-fluid">
@@ -198,9 +216,55 @@
                 <div class="modal-body">
                     <p>L'adresse n'a pas été trouvée à La Réunion. Voici des suggestions proches :</p>
                     <div id="closestAddressOptions" class="list-group"></div>
+                    <div class="mt-3 text-center">
+                        <p class="mb-2">Ou</p>
+                        <button type="button" class="btn btn-primary btn-lg" onclick="openWazeForSearch()">
+                            <i class="fas fa-search"></i> Chercher sur Waze
+                        </button>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-info" onclick="showManualGPSModal()">
+                                <i class="fas fa-map-marker-alt"></i> Entrer les coordonnées GPS manuellement
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal pour la saisie manuelle des coordonnées GPS -->
+    <div class="modal fade" id="manualGPSModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">Entrer les coordonnées GPS</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Copiez-collez les coordonnées depuis Waze (format: <code>latitude, longitude</code>):</p>
+                    <div class="mb-3">
+                        <label for="gpsCoordinates" class="form-label">Coordonnées GPS</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="gpsCoordinates" 
+                                   placeholder="Ex: -20.9286, 55.6142" required>
+                            <button class="btn btn-outline-secondary" type="button" onclick="pasteFromClipboard()">
+                                <i class="fas fa-paste"></i> Coller
+                            </button>
+                        </div>
+                        <div class="form-text">Format: <code>latitude, longitude</code> (séparés par une virgule)</div>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Assurez-vous que les coordonnées sont pour La Réunion
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmManualGPS()">
+                        <i class="fas fa-check"></i> Confirmer
+                    </button>
                 </div>
             </div>
         </div>
@@ -691,6 +755,144 @@
         }
 
         // ======================
+        // FONCTIONS POUR WAZE ET GPS MANUEL
+        // ======================
+        
+        // Variable pour stocker les données en attente de coordonnées GPS
+        let pendingGPSOrder = null;
+
+        // Ouvrir Waze pour chercher une adresse
+        function openWazeForSearch() {
+            // Stocker les données du formulaire en attente
+            const customerName = document.getElementById('customerName').value.trim();
+            const address = document.getElementById('address').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const priority = document.getElementById('priority').checked ? 1 : 0;
+
+            if (!customerName) {
+                showError("Veuillez indiquer un nom de client.");
+                return;
+            }
+
+            // Stocker les données en attente
+            pendingGPSOrder = {
+                customerName: customerName,
+                address: address,
+                phone: phone,
+                priority: priority
+            };
+
+            // Ouvrir Waze en mode recherche
+            window.open('https://www.waze.com/fr/livemap', '_blank');
+
+            // Fermer la modal actuelle
+            const modalEl = document.getElementById('closestAddressModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+            }
+
+            // Afficher un message pour guider l'utilisateur
+            showError("Waze s'ouvre dans un nouvel onglet. Cherchez votre adresse, copiez les coordonnées (latitude, longitude) depuis l'URL ou l'interface, puis collez-les dans la fenêtre de saisie manuelle.");
+        }
+
+        // Afficher la modal pour la saisie manuelle des coordonnées GPS
+        function showManualGPSModal() {
+            // Stocker les données du formulaire en attente
+            const customerName = document.getElementById('customerName').value.trim();
+            const address = document.getElementById('address').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const priority = document.getElementById('priority').checked ? 1 : 0;
+
+            if (!customerName) {
+                showError("Veuillez indiquer un nom de client.");
+                return;
+            }
+
+            // Stocker les données en attente
+            pendingGPSOrder = {
+                customerName: customerName,
+                address: address,
+                phone: phone,
+                priority: priority
+            };
+
+            // Vider le champ de coordonnées
+            document.getElementById('gpsCoordinates').value = '';
+
+            // Fermer la modal actuelle
+            const closestModalEl = document.getElementById('closestAddressModal');
+            if (closestModalEl) {
+                const closestModal = bootstrap.Modal.getInstance(closestModalEl);
+                closestModal.hide();
+            }
+
+            // Afficher la modal de saisie manuelle
+            const manualModalEl = document.getElementById('manualGPSModal');
+            if (manualModalEl) {
+                const manualModal = new bootstrap.Modal(manualModalEl);
+                manualModal.show();
+            }
+        }
+
+        // Coller depuis le presse-papiers
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.getElementById('gpsCoordinates').value = text;
+            } catch (err) {
+                console.error('Impossible de lire le presse-papiers:', err);
+                showError('Impossible de coller depuis le presse-papiers. Veuillez copier manuellement les coordonnées.');
+            }
+        }
+
+        // Confirmer les coordonnées GPS manuelles
+        function confirmManualGPS() {
+            const coordinatesInput = document.getElementById('gpsCoordinates').value.trim();
+
+            // Parser les coordonnées (format: lat, lng)
+            const coordsMatch = coordinatesInput.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+            
+            if (!coordsMatch) {
+                showError("Format de coordonnées invalide. Utilisez le format: latitude, longitude (ex: -20.9286, 55.6142)");
+                return;
+            }
+
+            const lat = parseFloat(coordsMatch[1]);
+            const lng = parseFloat(coordsMatch[2]);
+
+            // Vérifier que les coordonnées sont dans les limites de La Réunion
+            if (lat < -21.4 || lat > -20.8 || lng < 55.2 || lng > 55.9) {
+                showError("Les coordonnées ne semblent pas être pour La Réunion. Veuillez vérifier et réessayer.");
+                return;
+            }
+
+            // Si on a des données en attente, créer la commande
+            if (pendingGPSOrder) {
+                addOrder(
+                    pendingGPSOrder.customerName,
+                    pendingGPSOrder.address,
+                    lat,
+                    lng,
+                    pendingGPSOrder.phone,
+                    pendingGPSOrder.priority
+                );
+
+                // Réinitialiser
+                pendingGPSOrder = null;
+                document.getElementById('addOrderForm').reset();
+                document.getElementById('gpsCoordinates').value = '';
+
+                // Fermer la modal
+                const modalEl = document.getElementById('manualGPSModal');
+                if (modalEl) {
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    modal.hide();
+                }
+            }
+        }
+
+        // ======================
         // INITIALISATION
         // ======================
         document.addEventListener('DOMContentLoaded', () => {
@@ -728,9 +930,9 @@
                         showClosestAddresses([closestFromOrders], address);
                         return;
                     } else {
-                        // Dernier recours : utiliser les coordonnées de la pharmacie
-                        showError("Aucune adresse trouvée à La Réunion. Utilisation des coordonnées de la pharmacie par défaut.");
-                        addOrder(customerName, address, pharmacy.lat, pharmacy.lng, phone, priority);
+                        // Ouvrir automatiquement la modal pour chercher sur Waze ou entrer manuellement
+                        showManualGPSModal();
+                        return;
                     }
                 }
 
