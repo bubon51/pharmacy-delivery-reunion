@@ -1,27 +1,28 @@
+// APPLICATION PRINCIPALE
+// ============================================
+
+// Variables globales
+let orders = [];
+let pendingGPSOrder = null;
+let pendingClosestAddress = null;
+=======
 // ============================================
 // APPLICATION PRINCIPALE
 // ============================================
 
-// Importer la configuration
-const PHARMACY = {
-    id: 1,
-    name: "Pharmacie de Saint-Suzanne",
-    address: "133 avenue du Mahatma Gandhi, 97441 Saint-Suzanne",
-    lat: -20.932179057032947,
-    lng: 55.64139511027464
-};
+// Variables globales (accessibles depuis tous les modules)
+window.orders = [];
+window.pendingGPSOrder = null;
+window.pendingClosestAddress = null;
 
-const REUNION_BOUNDS = [
-    [-21.4, 55.2],
-    [-20.8, 55.9]
-];
-
-const GOOGLE_MAPS_API_KEY = 'AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc';
+// Alias pour la compatibilité avec le code existant
+let orders = window.orders;
+let pendingGPSOrder = window.pendingGPSOrder;
+let pendingClosestAddress = window.pendingClosestAddress;============================================
+// APPLICATION PRINCIPALE
+// ============================================
 
 // Variables globales
-let map;
-let markers = [];
-let polyline;
 let orders = [];
 let pendingGPSOrder = null;
 let pendingClosestAddress = null;
@@ -34,123 +35,57 @@ document.addEventListener('DOMContentLoaded', () => {
     // Charger les commandes
     orders = loadOrders();
     
-    // Initialiser la carte
-    initMap();
+    // Initialiser la carte (sera appelée quand Google Maps API sera prête)
+    const initApp = () => {
+        initMap();
+        renderOrders();
+        setupEventListeners();
+        
+        // Initialiser les optimisations mobiles
+        if (isMobileDevice()) {
+            setupMobileOptimizations();
+        }
+        
+        // Mettre à jour la date de dernière mise à jour
+        updateLastUpdatedDate();
+    };
     
-    // Rendre les commandes
-    renderOrders();
-    
-    // Configurer les écouteurs d'événements
-    setupEventListeners();
-    
-    // Initialiser les optimisations mobiles
-    if (isMobileDevice()) {
-        setupMobileOptimizations();
+    // Si Google Maps API est déjà chargée, initialiser maintenant
+    if (typeof google !== 'undefined' && google.maps) {
+        initApp();
+    } else {
+        // Sinon, attendre que l'API soit chargée
+        const checkGoogleMaps = setInterval(() => {
+            if (typeof google !== 'undefined' && google.maps) {
+                clearInterval(checkGoogleMaps);
+                initApp();
+            }
+        }, 100);
+        
+        // Timeout de sécurité après 10 secondes
+        setTimeout(() => {
+            clearInterval(checkGoogleMaps);
+            if (typeof google === 'undefined' || !google.maps) {
+                console.error('Google Maps API non chargée après 10 secondes');
+                showError('Impossible de charger Google Maps. Vérifiez votre connexion internet.');
+            }
+        }, 10000);
     }
 });
 
-// ============================================
-// FONCTIONS DE CARTE
-// ============================================
-
-function initMap() {
-    if (map) return;
-
-    // Initialiser la carte centrée sur La Réunion
-    map = L.map('map', {
-        maxBounds: REUNION_BOUNDS,
-        maxBoundsViscosity: 1.0,
-        gestureHandling: true,
-        tap: true,
-        touchZoom: true,
-        scrollWheelZoom: !isMobileDevice()
-    }).setView([-20.8785, 55.4484], 10);
-
-    // Ajouter les tuiles OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 18
-    }).addTo(map);
-
-    // Correction pour les icônes Leaflet
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png'
-    });
-
-    // Icône personnalisée pour la pharmacie
-    const pharmacyIcon = L.icon({
-        iconUrl: 'https://cdn-icons-png.flaticon.com/512/1087/1087915.png',
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -32]
-    });
-
-    // Ajouter le marqueur de la pharmacie
-    L.marker([PHARMACY.lat, PHARMACY.lng], { icon: pharmacyIcon })
-        .addTo(map)
-        .bindPopup(`<b>${PHARMACY.name}</b><br>${PHARMACY.address}`);
-
-    markers.push(L.marker([PHARMACY.lat, PHARMACY.lng], { icon: pharmacyIcon }));
-
-    // Écouter les changements de taille de fenêtre pour mobile
-    window.addEventListener('resize', () => {
-        if (map) {
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 100);
-        }
-    });
-}
-
-function updateMap() {
-    if (!map) {
-        console.error("La carte n'est pas initialisée.");
-        return;
-    }
-
-    // Effacer tous les marqueurs sauf la pharmacie
-    markers.slice(1).forEach(marker => {
-        if (map.hasLayer(marker)) map.removeLayer(marker);
-    });
-    markers = markers.slice(0, 1); // Garder uniquement le marqueur de la pharmacie
-
-    // Ajouter les marqueurs des commandes
-    orders.forEach((order, index) => {
-        const marker = L.marker([order.lat, order.lng])
-            .addTo(map)
-            .bindPopup(`
-                <b>${index + 1}. ${order.customerName}</b><br>
-                ${order.address}<br>
-                <button onclick="openGoogleMaps(${order.lat}, ${order.lng})" class="btn-google-maps mt-2">
-                    <i class="fas fa-directions"></i> Naviguer
-                </button>
-            `);
-        markers.push(marker);
-    });
-
-    // Dessiner l'itinéraire
-    if (orders.length > 0) {
-        if (polyline && map.hasLayer(polyline)) map.removeLayer(polyline);
-
-        const routePoints = [
-            [PHARMACY.lat, PHARMACY.lng],
-            ...orders.map(o => [o.lat, o.lng])
-        ];
-
-        polyline = L.polyline(routePoints, {
-            color: 'blue',
-            weight: 5,
-            opacity: 0.7
-        }).addTo(map);
-
-        map.fitBounds(routePoints);
-    } else {
-        map.setView([PHARMACY.lat, PHARMACY.lng], 15);
+function updateLastUpdatedDate() {
+    const dateEl = document.getElementById('lastUpdatedDate');
+    if (dateEl) {
+        dateEl.textContent = new Date().toLocaleString('fr-FR');
     }
 }
+
+// ============================================
+// FONCTIONS DE CARTE (délégées à map.js)
+// Ces fonctions sont maintenant dans map.js qui utilise Google Maps API
+// ============================================
+
+// initMap() et updateMap() sont définies dans map.js
 
 // ============================================
 // FONCTIONS DE RENDU
