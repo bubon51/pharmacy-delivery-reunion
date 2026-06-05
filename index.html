@@ -122,6 +122,52 @@
         .btn-waze-search:hover {
             background-color: #0056d3;
         }
+
+        /* Style pour les cartes de statistiques */
+        .stat-card {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+            min-width: 100px;
+            border: 1px solid #e9ecef;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .stat-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        /* Style pour l'autocomplétion des clients */
+        #customerSuggestions {
+            position: absolute;
+            z-index: 1000;
+            width: calc(100% - 30px);
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            display: none;
+        }
+        #customerSuggestions .list-group-item {
+            cursor: pointer;
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #f1f3f5;
+        }
+        #customerSuggestions .list-group-item:hover {
+            background-color: #f8f9fa;
+        }
+        #customerSuggestions .list-group-item:last-child {
+            border-bottom: none;
+        }
 </style>
 </head>
 <body>
@@ -138,9 +184,11 @@
                     </div>
                     <div class="card-body">
                         <form id="addOrderForm">
-                            <div class="mb-3">
+                            <div class="mb-3 position-relative">
                                 <label for="customerName" class="form-label">Nom du client</label>
-                                <input type="text" class="form-control" id="customerName" required>
+                                <input type="text" class="form-control" id="customerName" required 
+                                       placeholder="Commencez à taper pour voir les clients existants...">
+                                <div id="customerSuggestions" class="list-group"></div>
                             </div>
                             <div class="mb-3">
                                 <label for="address" class="form-label">Adresse (La Réunion uniquement)</label>
@@ -183,6 +231,7 @@
                 <div id="map"></div>
                 <div id="routeSteps" class="route-steps">
                     <h5><i class="fas fa-map-marked-alt"></i> Itinéraire optimisé</h5>
+                    <div id="routeStats" class="mb-3"></div>
                     <div id="stepsList"></div>
                 </div>
             </div>
@@ -240,30 +289,71 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-info text-white">
-                    <h5 class="modal-title">Entrer les coordonnées GPS</h5>
+                    <h5 class="modal-title">
+                        <i class="fas fa-map-marker-alt"></i> Entrer les coordonnées GPS
+                    </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Copiez-collez les coordonnées depuis Waze (format: <code>latitude, longitude</code>):</p>
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Comment obtenir les coordonnées depuis Waze :</strong>
+                        <ol class="mb-0 mt-2">
+                            <li>Cherchez votre adresse sur Waze</li>
+                            <li>Dans l'URL, repérez <code class="bg-light px-2 py-1 rounded">ll=-20.9286,55.6142</code></li>
+                            <li>Copiez les valeurs après <code>ll=</code></li>
+                            <li>Collez-les ici au format : <code>-20.9286, 55.6142</code></li>
+                        </ol>
+                    </div>
                     <div class="mb-3">
-                        <label for="gpsCoordinates" class="form-label">Coordonnées GPS</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="gpsCoordinates" 
-                                   placeholder="Ex: -20.9286, 55.6142" required>
-                            <button class="btn btn-outline-secondary" type="button" onclick="pasteFromClipboard()">
+                        <label for="gpsCoordinates" class="form-label">
+                            <i class="fas fa-crosshairs"></i> Coordonnées GPS (Latitude, Longitude)
+                        </label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text bg-light">
+                                <i class="fas fa-map-pin text-primary"></i>
+                            </span>
+                            <input type="text" class="form-control form-control-lg fw-bold" id="gpsCoordinates" 
+                                   placeholder="Ex: -20.9286, 55.6142" 
+                                   style="font-family: 'Courier New', monospace; letter-spacing: 1px;" required>
+                            <button class="btn btn-outline-primary" type="button" onclick="pasteFromClipboard()" 
+                                    title="Coller depuis le presse-papiers">
                                 <i class="fas fa-paste"></i> Coller
                             </button>
                         </div>
-                        <div class="form-text">Format: <code>latitude, longitude</code> (séparés par une virgule)</div>
+                        <div class="form-text text-muted">
+                            Format: <span class="badge bg-secondary">latitude, longitude</span> 
+                            (séparés par une virgule, ex: -20.8785, 55.4484)
+                        </div>
                     </div>
                     <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i> Assurez-vous que les coordonnées sont pour La Réunion
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        Vérifiez que les coordonnées correspondent bien à une adresse à <strong>La Réunion</strong>
+                    </div>
+                    <div id="gpsPreview" class="mt-3 p-3 bg-light rounded d-none">
+                        <h6 class="mb-2"><i class="fas fa-eye"></i> Aperçu des coordonnées :</h6>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Latitude :</strong> <span id="previewLat" class="text-primary"></span>
+                            </div>
+                            <div class="col-6">
+                                <strong>Longitude :</strong> <span id="previewLng" class="text-primary"></span>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-check-circle text-success"></i> 
+                                Coordonnées valides pour La Réunion
+                            </small>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Annuler
+                    </button>
                     <button type="button" class="btn btn-primary" onclick="confirmManualGPS()">
-                        <i class="fas fa-check"></i> Confirmer
+                        <i class="fas fa-check"></i> Confirmer et créer la commande
                     </button>
                 </div>
             </div>
@@ -522,6 +612,34 @@
                 }).join('');
         }
 
+        // Afficher les statistiques de la tournée
+        function renderRouteStats(stats) {
+            const container = document.getElementById('routeStats');
+            if (!container) return;
+
+            if (!stats || stats.totalDistance === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-2">Aucune tournée en cours</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.totalDistance} km</div>
+                        <div class="stat-label"><i class="fas fa-road"></i> Distance totale</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.totalDuration} min</div>
+                        <div class="stat-label"><i class="fas fa-clock"></i> Durée estimée</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${orders.length}</div>
+                        <div class="stat-label"><i class="fas fa-map-marker-alt"></i> Arrêts</div>
+                    </div>
+                </div>
+            `;
+        }
+
         function renderRouteSteps() {
             const container = document.getElementById('stepsList');
             if (!container) return;
@@ -598,53 +716,100 @@
             }
         }
 
-        function optimizeRoute() {
+        // Optimiser la tournée avec les routes réelles
+        async function optimizeRoute() {
             if (orders.length === 0) {
                 showError("Aucune commande à optimiser.");
                 return;
             }
 
-            // Algorithme du plus proche voisin
-            const route = [];
-            let currentLat = pharmacy.lat;
-            let currentLng = pharmacy.lng;
-            const remaining = [...orders];
+            // Afficher un message de chargement
+            showError("Optimisation de la tournée en cours... Veuillez patienter.");
 
-            while (remaining.length > 0) {
-                let nearestIndex = 0;
-                let minDistance = Infinity;
-
-                remaining.forEach((order, index) => {
-                    const distance = Math.sqrt(
-                        Math.pow(order.lat - currentLat, 2) +
-                        Math.pow(order.lng - currentLng, 2)
-                    );
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        nearestIndex = index;
-                    }
-                });
-
-                if (nearestIndex !== -1) {
-                    route.push(remaining[nearestIndex]);
-                    currentLat = remaining[nearestIndex].lat;
-                    currentLng = remaining[nearestIndex].lng;
-                    remaining.splice(nearestIndex, 1);
-                } else {
-                    route.push(remaining[0]);
-                    remaining.shift();
+            try {
+                // Utiliser l'optimisation avec les routes réelles
+                const optimizedRoute = await optimizeRouteWithRealRoutes(pharmacy, orders);
+                
+                if (optimizedRoute.length > 0) {
+                    orders = optimizedRoute;
+                    saveOrders();
+                    renderOrders();
+                    updateMap();
+                    renderRouteSteps();
+                    
+                    // Calculer et afficher les statistiques de la tournée
+                    const stats = await calculateRouteStats(pharmacy, orders);
+                    
+                    // Afficher les stats
+                    renderRouteStats(stats);
+                    
+                    // Afficher une notification
+                    setTimeout(() => {
+                        showError(`Tournée optimisée ! Distance: ${stats.totalDistance} km, Durée: ${stats.totalDuration} min`);
+                    }, 500);
                 }
-            }
+            } catch (error) {
+                console.error("Erreur lors de l'optimisation:", error);
+                showError("Erreur lors de l'optimisation de la tournée. Utilisation de l'ancienne méthode.");
+                
+                // Revenir à l'ancienne méthode en cas d'erreur
+                const route = [];
+                let currentLat = pharmacy.lat;
+                let currentLng = pharmacy.lng;
+                const remaining = [...orders];
 
-            orders = route;
-            saveOrders();
-            renderOrders();
-            updateMap();
-            renderRouteSteps();
+                while (remaining.length > 0) {
+                    let nearestIndex = 0;
+                    let minDistance = Infinity;
+
+                    remaining.forEach((order, index) => {
+                        const distance = Math.sqrt(
+                            Math.pow(order.lat - currentLat, 2) +
+                            Math.pow(order.lng - currentLng, 2)
+                        );
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            nearestIndex = index;
+                        }
+                    });
+
+                    if (nearestIndex !== -1) {
+                        route.push(remaining[nearestIndex]);
+                        currentLat = remaining[nearestIndex].lat;
+                        currentLng = remaining[nearestIndex].lng;
+                        remaining.splice(nearestIndex, 1);
+                    } else {
+                        route.push(remaining[0]);
+                        remaining.shift();
+                    }
+                }
+
+                orders = route;
+                saveOrders();
+                renderOrders();
+                updateMap();
+                renderRouteSteps();
+            }
         }
 
-        function openWaze(lat, lng) {
-            window.open(`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
+        // Ouvrir Waze avec les coordonnées et les copier dans le presse-papiers
+        async function openWaze(lat, lng) {
+            try {
+                // Copier les coordonnées dans le presse-papiers
+                const coordsText = `${lat}, ${lng}`;
+                await navigator.clipboard.writeText(coordsText);
+                
+                // Ouvrir Waze avec les coordonnées
+                window.open(`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
+                
+                // Afficher une confirmation
+                showError(`Coordonnées copiées: ${coordsText}. Waze s'ouvre avec ces coordonnées.`);
+            } catch (err) {
+                console.error('Impossible de copier dans le presse-papiers:', err);
+                // Ouvrir Waze quand même
+                window.open(`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
+                showError('Waze ouvert. Copiez manuellement les coordonnées si nécessaire.');
+            }
         }
 
         function saveOrders() {
@@ -761,7 +926,7 @@
         // Variable pour stocker les données en attente de coordonnées GPS
         let pendingGPSOrder = null;
 
-        // Ouvrir Waze pour chercher une adresse
+        // Ouvrir Waze avec l'adresse pré-remplie dans la recherche
         function openWazeForSearch() {
             // Stocker les données du formulaire en attente
             const customerName = document.getElementById('customerName').value.trim();
@@ -774,6 +939,11 @@
                 return;
             }
 
+            if (!address) {
+                showError("Veuillez indiquer une adresse.");
+                return;
+            }
+
             // Stocker les données en attente
             pendingGPSOrder = {
                 customerName: customerName,
@@ -782,8 +952,10 @@
                 priority: priority
             };
 
-            // Ouvrir Waze en mode recherche
-            window.open('https://www.waze.com/fr/livemap', '_blank');
+            // Ouvrir Waze avec l'adresse pré-remplie dans le champ de recherche
+            // Format: https://www.waze.com/ul?q=<adresse_encodée>&navigate=yes
+            const encodedAddress = encodeURIComponent(address + ', La Réunion');
+            window.open(`https://www.waze.com/ul?q=${encodedAddress}&navigate=yes`, '_blank');
 
             // Fermer la modal actuelle
             const modalEl = document.getElementById('closestAddressModal');
@@ -793,7 +965,7 @@
             }
 
             // Afficher un message pour guider l'utilisateur
-            showError("Waze s'ouvre dans un nouvel onglet. Cherchez votre adresse, copiez les coordonnées (latitude, longitude) depuis l'URL ou l'interface, puis collez-les dans la fenêtre de saisie manuelle.");
+            showError("Waze s'ouvre avec votre adresse pré-remplie. Une fois l'adresse trouvée, copiez les coordonnées GPS depuis l'URL de Waze (format: ll=LATITUDE,LONGITUDE) et collez-les dans la fenêtre de saisie manuelle.");
         }
 
         // Afficher la modal pour la saisie manuelle des coordonnées GPS
@@ -893,6 +1065,225 @@
         }
 
         // ======================
+        // FONCTIONS DE ROUTAGE AVEC OSRM (OpenStreetMap Routing Machine)
+        // ======================
+
+        // Calculer la distance et la durée entre deux points via OSRM
+        async function getRouteDistance(lat1, lng1, lat2, lng2) {
+            try {
+                // Utiliser l'API OSRM (demo server)
+                const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    return {
+                        distance: data.routes[0].distance, // en mètres
+                        duration: data.routes[0].duration // en secondes
+                    };
+                }
+                return null;
+            } catch (error) {
+                console.error("Erreur OSRM:", error);
+                // Retourner une estimation basée sur la distance à vol d'oiseau
+                const dx = lng2 - lng1;
+                const dy = lat2 - lat1;
+                const distance = Math.sqrt(dx * dx + dy * dy) * 111320; // ~111km par degré
+                return { distance, duration: distance / 13.89 }; // ~50km/h estimation
+            }
+        }
+
+        // Calculer la matrice de distances entre plusieurs points
+        async function calculateDistanceMatrix(points) {
+            const matrix = [];
+            
+            for (let i = 0; i < points.length; i++) {
+                matrix[i] = [];
+                for (let j = 0; j < points.length; j++) {
+                    if (i === j) {
+                        matrix[i][j] = { distance: 0, duration: 0 };
+                    } else {
+                        const result = await getRouteDistance(
+                            points[i].lat, points[i].lng,
+                            points[j].lat, points[j].lng
+                        );
+                        matrix[i][j] = result || { distance: 0, duration: 0 };
+                    }
+                }
+            }
+            
+            return matrix;
+        }
+
+        // Optimiser la tournée en tenant compte des routes réelles (algorithme du voyageur de commerce simplifié)
+        async function optimizeRouteWithRealRoutes(pharmacy, orders) {
+            if (orders.length === 0) return [];
+            
+            // Créer la liste des points (pharmacie + commandes)
+            const allPoints = [
+                { id: 'pharmacy', lat: pharmacy.lat, lng: pharmacy.lng, isPharmacy: true },
+                ...orders.map(order => ({ 
+                    id: order.id, 
+                    lat: order.lat, 
+                    lng: order.lng, 
+                    isPharmacy: false,
+                    order: order
+                }))
+            ];
+            
+            // Calculer la matrice de distances
+            const distanceMatrix = await calculateDistanceMatrix(allPoints);
+            
+            // Algorithme du plus proche voisin avec distances réelles
+            const optimizedRoute = [];
+            let currentIndex = 0; // Commencer par la pharmacie
+            const visited = new Set();
+            visited.add(0); // Marquer la pharmacie comme visitée
+            
+            while (visited.size < allPoints.length) {
+                let nearestIndex = -1;
+                let minDistance = Infinity;
+                
+                for (let j = 0; j < allPoints.length; j++) {
+                    if (!visited.has(j)) {
+                        const dist = distanceMatrix[currentIndex][j].distance;
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            nearestIndex = j;
+                        }
+                    }
+                }
+                
+                if (nearestIndex !== -1) {
+                    optimizedRoute.push(allPoints[nearestIndex]);
+                    visited.add(nearestIndex);
+                    currentIndex = nearestIndex;
+                }
+            }
+            
+            // Retourner uniquement les commandes (sans la pharmacie) dans l'ordre optimisé
+            return optimizedRoute
+                .filter(point => !point.isPharmacy)
+                .map(point => point.order);
+        }
+
+        // Calculer la distance totale et la durée de la tournée
+        async function calculateRouteStats(pharmacy, route) {
+            if (route.length === 0) {
+                return { totalDistance: 0, totalDuration: 0, steps: [] };
+            }
+            
+            const allPoints = [
+                { lat: pharmacy.lat, lng: pharmacy.lng, name: pharmacy.name },
+                ...route.map(order => ({ lat: order.lat, lng: order.lng, name: order.customerName }))
+            ];
+            
+            let totalDistance = 0;
+            let totalDuration = 0;
+            const steps = [];
+            
+            for (let i = 0; i < allPoints.length - 1; i++) {
+                const result = await getRouteDistance(
+                    allPoints[i].lat, allPoints[i].lng,
+                    allPoints[i + 1].lat, allPoints[i + 1].lng
+                );
+                
+                const distance = result ? result.distance : 0;
+                const duration = result ? result.duration : 0;
+                
+                totalDistance += distance;
+                totalDuration += duration;
+                
+                steps.push({
+                    from: allPoints[i].name,
+                    to: allPoints[i + 1].name,
+                    distance: distance,
+                    duration: duration
+                });
+            }
+            
+            return {
+                totalDistance: Math.round(totalDistance / 1000 * 10) / 10, // en km
+                totalDuration: Math.round(totalDuration / 60), // en minutes
+                steps: steps
+            };
+        }
+
+        // ======================
+        // FONCTIONS POUR L'AUTOCOMPLÉTION DES CLIENTS
+        // ======================
+
+        // Récupérer tous les clients uniques depuis les commandes
+        function getAllCustomers() {
+            const customers = [];
+            const customerMap = new Map();
+            
+            orders.forEach(order => {
+                if (!customerMap.has(order.customerName.toLowerCase())) {
+                    customerMap.set(order.customerName.toLowerCase(), {
+                        name: order.customerName,
+                        address: order.address,
+                        lat: order.lat,
+                        lng: order.lng,
+                        phone: order.phone
+                    });
+                }
+            });
+            
+            return Array.from(customerMap.values());
+        }
+
+        // Rechercher des clients par nom
+        function searchCustomers(query) {
+            if (!query || query.length < 2) return [];
+            
+            const allCustomers = getAllCustomers();
+            const lowerQuery = query.toLowerCase();
+            
+            return allCustomers.filter(customer =>
+                customer.name.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        // Afficher les suggestions de clients
+        function showCustomerSuggestions(suggestions) {
+            const container = document.getElementById('customerSuggestions');
+            if (!container) return;
+
+            if (suggestions.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = suggestions.map(customer => {
+                const escapedName = customer.name.replace(/'/g, "\'");
+                const escapedAddress = customer.address.replace(/'/g, "\'");
+                return `
+                    <div class="list-group-item" onclick="selectCustomer('${escapedName}', '${escapedAddress}', ${customer.lat}, ${customer.lng}, '${customer.phone || ''}')">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${customer.name}</strong>
+                                <div class="small text-muted">${customer.address}</div>
+                            </div>
+                            <i class="fas fa-user-check text-primary"></i>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.style.display = 'block';
+        }
+
+        // Sélectionner un client de la liste
+        function selectCustomer(name, address, lat, lng, phone) {
+            document.getElementById('customerName').value = name;
+            document.getElementById('address').value = address;
+            document.getElementById('phone').value = phone || '';
+            document.getElementById('customerSuggestions').style.display = 'none';
+            document.getElementById('addressSuggestions').style.display = 'none';
+        }
+
+        // ======================
         // INITIALISATION
         // ======================
         document.addEventListener('DOMContentLoaded', () => {
@@ -980,8 +1371,14 @@
             // Masquer les suggestions en cliquant ailleurs
             document.addEventListener('click', (e) => {
                 const addressSuggestions = document.getElementById('addressSuggestions');
+                const customerSuggestions = document.getElementById('customerSuggestions');
+                
                 if (addressSuggestions && !e.target.closest('#address') && !e.target.closest('#addressSuggestions')) {
                     addressSuggestions.style.display = 'none';
+                }
+                
+                if (customerSuggestions && !e.target.closest('#customerName') && !e.target.closest('#customerSuggestions')) {
+                    customerSuggestions.style.display = 'none';
                 }
             });
         });
