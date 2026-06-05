@@ -1,4 +1,63 @@
+// APPLICATION PRINCIPALE
 // ============================================
+
+// Variables globales
+window.orders = loadOrders() || [];
+window.pendingGPSOrder = null;
+window.pendingClosestAddress = null;
+
+// ============================================
+// INITIALISATION
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialiser la carte (sera appelée quand Google Maps API sera prête)
+    const initApp = () => {
+        initMap();
+        renderOrders();
+        setupEventListeners();
+        
+        // Initialiser les optimisations mobiles
+        if (isMobileDevice()) {
+            setupMobileOptimizations();
+        }
+        
+        // Mettre à jour la date de dernière mise à jour
+        updateLastUpdatedDate();
+    };
+=======
+// ============================================
+// APPLICATION PRINCIPALE
+// ============================================
+
+// Variables globales
+window.orders = [];
+window.pendingGPSOrder = null;
+window.pendingClosestAddress = null;
+
+// ============================================
+// INITIALISATION
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Charger les commandes depuis localStorage
+    window.orders = loadOrders() || [];
+    console.log('Commandes chargées:', window.orders);
+    
+    // Initialiser la carte (sera appelée quand Google Maps API sera prête)
+    const initApp = () => {
+        initMap();
+        renderOrders();
+        setupEventListeners();
+        
+        // Initialiser les optimisations mobiles
+        if (isMobileDevice()) {
+            setupMobileOptimizations();
+        }
+        
+        // Mettre à jour la date de dernière mise à jour
+        updateLastUpdatedDate();
+    };============================================
 // APPLICATION PRINCIPALE
 // ============================================
 
@@ -27,15 +86,21 @@ document.addEventListener('DOMContentLoaded', () => {
         updateLastUpdatedDate();
     };
     
-    // Si Google Maps API est déjà chargée, initialiser maintenant
+    // Initialiser l'application même si Google Maps n'est pas encore chargé
+    // La carte sera initialisée quand l'API sera prête
+    initApp();
+    
+    // Si Google Maps API est déjà chargée, initialiser la carte maintenant
     if (typeof google !== 'undefined' && google.maps) {
-        initApp();
+        initMap();
+        updateMap();
     } else {
         // Sinon, attendre que l'API soit chargée
         const checkGoogleMaps = setInterval(() => {
             if (typeof google !== 'undefined' && google.maps) {
                 clearInterval(checkGoogleMaps);
-                initApp();
+                initMap();
+                updateMap();
             }
         }, 100);
         
@@ -44,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(checkGoogleMaps);
             if (typeof google === 'undefined' || !google.maps) {
                 console.error('Google Maps API non chargée après 10 secondes');
-                showError('Impossible de charger Google Maps. Vérifiez votre connexion internet.');
+                showError('Impossible de charger Google Maps. La carte ne s\'affichera pas, mais vous pouvez toujours ajouter des commandes.');
             }
         }, 10000);
     }
@@ -197,6 +262,8 @@ function addOrderToList(customerName, address, lat, lng, phone, priority) {
     
     window.orders.push(newOrder);
     saveOrders(window.orders);
+    console.log('Commande ajoutée:', newOrder);
+    console.log('Total commandes:', window.orders.length);
     renderOrders();
     updateMap();
     renderRouteSteps();
