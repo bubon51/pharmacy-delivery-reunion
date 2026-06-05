@@ -1,40 +1,17 @@
+// ============================================
 // APPLICATION PRINCIPALE
 // ============================================
 
 // Variables globales
-let orders = [];
-let pendingGPSOrder = null;
-let pendingClosestAddress = null;
-=======
-// ============================================
-// APPLICATION PRINCIPALE
-// ============================================
-
-// Variables globales (accessibles depuis tous les modules)
-window.orders = [];
+window.orders = loadOrders() || [];
 window.pendingGPSOrder = null;
 window.pendingClosestAddress = null;
-
-// Alias pour la compatibilité avec le code existant
-let orders = window.orders;
-let pendingGPSOrder = window.pendingGPSOrder;
-let pendingClosestAddress = window.pendingClosestAddress;============================================
-// APPLICATION PRINCIPALE
-// ============================================
-
-// Variables globales
-let orders = [];
-let pendingGPSOrder = null;
-let pendingClosestAddress = null;
 
 // ============================================
 // INITIALISATION
 // ============================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Charger les commandes
-    orders = loadOrders();
-    
     // Initialiser la carte (sera appelée quand Google Maps API sera prête)
     const initApp = () => {
         initMap();
@@ -82,7 +59,6 @@ function updateLastUpdatedDate() {
 
 // ============================================
 // FONCTIONS DE CARTE (délégées à map.js)
-// Ces fonctions sont maintenant dans map.js qui utilise Google Maps API
 // ============================================
 
 // initMap() et updateMap() sont définies dans map.js
@@ -95,9 +71,9 @@ function renderOrders() {
     const container = document.getElementById('ordersList');
     if (!container) return;
 
-    container.innerHTML = orders.length === 0
+    container.innerHTML = window.orders.length === 0
         ? '<div class="text-center text-muted py-3">Aucune commande en attente</div>'
-        : orders.map((order, index) => {
+        : window.orders.map((order, index) => {
             const escapedName = order.customerName.replace(/'/g, "\\'");
             return `
                 <div class="card order-card ${order.priority ? 'urgent' : ''} mb-2">
@@ -133,14 +109,14 @@ async function renderRouteSteps() {
     const container = document.getElementById('stepsList');
     if (!container) return;
 
-    if (orders.length === 0) {
+    if (window.orders.length === 0) {
         container.innerHTML = '<div class="text-center text-muted py-2">Aucune tournée optimisée</div>';
         renderRouteStats(null);
         return;
     }
 
     // Calculer les stats de la tournée
-    const stats = await calculateRouteStats(PHARMACY, orders);
+    const stats = await calculateRouteStats(PHARMACY, window.orders);
     renderRouteStats(stats);
 
     container.innerHTML = `
@@ -156,7 +132,7 @@ async function renderRouteSteps() {
                 <i class="fas fa-directions"></i> Google Maps
             </button>
         </div>
-        ${orders.map((order, index) => {
+        ${window.orders.map((order, index) => {
             const escapedName = order.customerName.replace(/'/g, "\\'");
             return `
                 <div class="step-item">
@@ -196,7 +172,7 @@ function renderRouteStats(stats) {
                 <div class="stat-label"><i class="fas fa-clock"></i> Durée estimée</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${orders.length}</div>
+                <div class="stat-value">${window.orders.length}</div>
                 <div class="stat-label"><i class="fas fa-map-marker-alt"></i> Arrêts</div>
             </div>
         </div>
@@ -219,25 +195,25 @@ function addOrderToList(customerName, address, lat, lng, phone, priority) {
         status: 'pending'
     };
     
-    orders.push(newOrder);
-    saveOrders(orders);
+    window.orders.push(newOrder);
+    saveOrders(window.orders);
     renderOrders();
     updateMap();
     renderRouteSteps();
 }
 
 function updateOrderStatus(orderId, newStatus) {
-    orders = orders.map(order =>
+    window.orders = window.orders.map(order =>
         order.id === orderId ? { ...order, status: newStatus } : order
     );
-    saveOrders(orders);
+    saveOrders(window.orders);
     renderOrders();
     updateMap();
 }
 
 function confirmDeleteOrder(orderId, customerName) {
     if (confirm(`Êtes-vous sûr de vouloir supprimer la commande de ${customerName} ?`)) {
-        orders = deleteOrder(orderId);
+        window.orders = deleteOrder(orderId);
         renderOrders();
         updateMap();
         renderRouteSteps();
@@ -272,7 +248,7 @@ async function openGoogleMaps(lat, lng) {
 // ============================================
 
 async function optimizeRoute() {
-    if (orders.length === 0) {
+    if (window.orders.length === 0) {
         showError("Aucune commande à optimiser.");
         return;
     }
@@ -282,17 +258,17 @@ async function optimizeRoute() {
 
     try {
         // Utiliser l'optimisation avec les routes réelles
-        const optimizedRoute = await optimizeRouteWithRealRoutes(PHARMACY, orders);
+        const optimizedRoute = await optimizeRouteWithRealRoutes(PHARMACY, window.orders);
         
         if (optimizedRoute.length > 0) {
-            orders = optimizedRoute;
-            saveOrders(orders);
+            window.orders = optimizedRoute;
+            saveOrders(window.orders);
             renderOrders();
             updateMap();
             renderRouteSteps();
             
             // Calculer et afficher les statistiques de la tournée
-            const stats = await calculateRouteStats(PHARMACY, orders);
+            const stats = await calculateRouteStats(PHARMACY, window.orders);
             renderRouteStats(stats);
             
             // Afficher une notification
@@ -308,7 +284,7 @@ async function optimizeRoute() {
         const route = [];
         let currentLat = PHARMACY.lat;
         let currentLng = PHARMACY.lng;
-        const remaining = [...orders];
+        const remaining = [...window.orders];
 
         while (remaining.length > 0) {
             let nearestIndex = 0;
@@ -336,8 +312,8 @@ async function optimizeRoute() {
             }
         }
 
-        orders = route;
-        saveOrders(orders);
+        window.orders = route;
+        saveOrders(window.orders);
         renderOrders();
         updateMap();
         renderRouteSteps();
@@ -432,7 +408,7 @@ function showManualGPSModal() {
     }
 
     // Stocker les données en attente
-    pendingGPSOrder = {
+    window.pendingGPSOrder = {
         customerName: customerName,
         address: address,
         phone: phone,
@@ -488,18 +464,18 @@ function confirmManualGPS() {
     }
 
     // Si on a des données en attente, créer la commande
-    if (pendingGPSOrder) {
+    if (window.pendingGPSOrder) {
         addOrderToList(
-            pendingGPSOrder.customerName,
-            pendingGPSOrder.address,
+            window.pendingGPSOrder.customerName,
+            window.pendingGPSOrder.address,
             lat,
             lng,
-            pendingGPSOrder.phone,
-            pendingGPSOrder.priority
+            window.pendingGPSOrder.phone,
+            window.pendingGPSOrder.priority
         );
 
         // Réinitialiser
-        pendingGPSOrder = null;
+        window.pendingGPSOrder = null;
         document.getElementById('addOrderForm').reset();
         document.getElementById('gpsCoordinates').value = '';
 
@@ -557,7 +533,7 @@ function showClosestAddresses(suggestions, originalQuery) {
     }).join('');
 
     // Stocker les suggestions et la requête originale
-    pendingClosestAddress = {
+    window.pendingClosestAddress = {
         suggestions: suggestions,
         originalQuery: originalQuery
     };
@@ -566,11 +542,11 @@ function showClosestAddresses(suggestions, originalQuery) {
 }
 
 function selectClosestAddress(index) {
-    if (!pendingClosestAddress || !pendingClosestAddress.suggestions[index]) {
+    if (!window.pendingClosestAddress || !window.pendingClosestAddress.suggestions[index]) {
         return;
     }
 
-    const selected = pendingClosestAddress.suggestions[index];
+    const selected = window.pendingClosestAddress.suggestions[index];
     document.getElementById('address').value = selected.address;
     document.getElementById('addressSuggestions').style.display = 'none';
 
@@ -681,7 +657,7 @@ function setupEventListeners() {
                 addOrderToList(customerName, googleResult[0].address, googleResult[0].lat, googleResult[0].lng, phone, priority);
             } else {
                 // Sinon, proposer les adresses proches des commandes existantes
-                const closestFromOrders = findClosestOrder(PHARMACY.lat, PHARMACY.lng, orders);
+                const closestFromOrders = findClosestOrder(PHARMACY.lat, PHARMACY.lng, window.orders);
 
                 if (closestFromOrders) {
                     showClosestAddresses([closestFromOrders], address);
@@ -706,7 +682,7 @@ function setupEventListeners() {
             clearTimeout(customerSearchTimeout);
             const query = e.target.value.trim();
             customerSearchTimeout = setTimeout(() => {
-                const suggestions = searchCustomers(orders, query);
+                const suggestions = searchCustomers(window.orders, query);
                 showCustomerSuggestions(suggestions);
             }, 300);
         });
