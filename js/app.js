@@ -118,7 +118,7 @@ async function renderRouteSteps() {
     }
 
     // Calculer les stats de la tournée
-    const stats = await calculateRouteStats(PHARMACY, window.orders);
+    const stats = await calculateRouteStats(PHARMACY, window.orders, GOOGLE_MAPS_API_KEY);
     renderRouteStats(stats);
 
     container.innerHTML = `
@@ -262,7 +262,7 @@ async function optimizeRoute() {
 
     try {
         // Utiliser l'optimisation avec les routes réelles
-        const optimizedRoute = await optimizeRouteWithRealRoutes(PHARMACY, window.orders);
+        const optimizedRoute = await optimizeRouteWithRealRoutes(PHARMACY, window.orders, GOOGLE_MAPS_API_KEY);
         
         if (optimizedRoute.length > 0) {
             window.orders = optimizedRoute;
@@ -272,7 +272,7 @@ async function optimizeRoute() {
             renderRouteSteps();
             
             // Calculer et afficher les statistiques de la tournée
-            const stats = await calculateRouteStats(PHARMACY, window.orders);
+            const stats = await calculateRouteStats(PHARMACY, window.orders, GOOGLE_MAPS_API_KEY);
             renderRouteStats(stats);
             
             // Afficher une notification

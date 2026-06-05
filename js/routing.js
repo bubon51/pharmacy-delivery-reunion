@@ -1,9 +1,30 @@
 // ============================================
-// ROUTAGE (OSRM)
+// ROUTAGE (GOOGLE MAPS DIRECTIONS + OSRM FALLBACK)
 // ============================================
 
-// Calculer la distance et la durée entre deux points via OSRM
-async function getRouteDistance(lat1, lng1, lat2, lng2) {
+// Calculer la distance et la durée entre deux points via Google Maps Directions API
+async function getRouteDistanceWithGoogle(lat1, lng1, lat2, lng2, apiKey) {
+    try {
+        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${lat1},${lng1}&destination=${lat2},${lng2}&key=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.status === 'OK' && data.routes && data.routes.length > 0) {
+            const route = data.routes[0];
+            return {
+                distance: route.legs[0].distance.value, // en mètres
+                duration: route.legs[0].duration.value // en secondes
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error("Erreur Google Maps Directions:", error);
+        return null;
+    }
+}
+
+// Calculer la distance et la durée entre deux points via OSRM (fallback)
+async function getRouteDistanceWithOSRM(lat1, lng1, lat2, lng2) {
     try {
         // Utiliser l'API OSRM (demo server)
         const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`;
@@ -19,16 +40,35 @@ async function getRouteDistance(lat1, lng1, lat2, lng2) {
         return null;
     } catch (error) {
         console.error("Erreur OSRM:", error);
-        // Retourner une estimation basée sur la distance à vol d'oiseau
-        const dx = lng2 - lng1;
-        const dy = lat2 - lat1;
-        const distance = Math.sqrt(dx * dx + dy * dy) * 111320; // ~111km par degré
-        return { distance, duration: distance / 13.89 }; // ~50km/h estimation
+        return null;
     }
 }
 
+// Calculer la distance et la durée entre deux points
+// Priorité: Google Maps Directions > OSRM > calcul à vol d'oiseau
+async function getRouteDistance(lat1, lng1, lat2, lng2, apiKey) {
+    // Essayer d'abord avec Google Maps Directions (plus précis pour La Réunion)
+    const googleResult = await getRouteDistanceWithGoogle(lat1, lng1, lat2, lng2, apiKey);
+    if (googleResult) {
+        return googleResult;
+    }
+    
+    // Fallback sur OSRM
+    const osrmResult = await getRouteDistanceWithOSRM(lat1, lng1, lat2, lng2);
+    if (osrmResult) {
+        return osrmResult;
+    }
+    
+    // Fallback final: estimation basée sur la distance à vol d'oiseau
+    // Note: Ce calcul est moins précis mais garantit que l'application fonctionne toujours
+    const dx = lng2 - lng1;
+    const dy = lat2 - lat1;
+    const distance = Math.sqrt(dx * dx + dy * dy) * 111320; // ~111km par degré
+    return { distance, duration: distance / 13.89 }; // ~50km/h estimation
+}
+
 // Calculer la matrice de distances entre plusieurs points
-async function calculateDistanceMatrix(points) {
+async function calculateDistanceMatrix(points, apiKey) {
     const matrix = [];
     
     for (let i = 0; i < points.length; i++) {
@@ -39,7 +79,8 @@ async function calculateDistanceMatrix(points) {
             } else {
                 const result = await getRouteDistance(
                     points[i].lat, points[i].lng,
-                    points[j].lat, points[j].lng
+                    points[j].lat, points[j].lng,
+                    apiKey
                 );
                 matrix[i][j] = result || { distance: 0, duration: 0 };
             }
@@ -50,7 +91,7 @@ async function calculateDistanceMatrix(points) {
 }
 
 // Optimiser la tournée en tenant compte des routes réelles
-async function optimizeRouteWithRealRoutes(pharmacy, orders) {
+async function optimizeRouteWithRealRoutes(pharmacy, orders, apiKey) {
     if (orders.length === 0) return [];
     
     // Créer la liste des points (pharmacie + commandes)
@@ -66,7 +107,7 @@ async function optimizeRouteWithRealRoutes(pharmacy, orders) {
     ];
     
     // Calculer la matrice de distances
-    const distanceMatrix = await calculateDistanceMatrix(allPoints);
+    const distanceMatrix = await calculateDistanceMatrix(allPoints, apiKey);
     
     // Algorithme du plus proche voisin avec distances réelles
     const optimizedRoute = [];
@@ -102,7 +143,7 @@ async function optimizeRouteWithRealRoutes(pharmacy, orders) {
 }
 
 // Calculer la distance totale et la durée de la tournée
-async function calculateRouteStats(pharmacy, route) {
+async function calculateRouteStats(pharmacy, route, apiKey) {
     if (route.length === 0) {
         return { totalDistance: 0, totalDuration: 0, steps: [] };
     }
@@ -119,7 +160,8 @@ async function calculateRouteStats(pharmacy, route) {
     for (let i = 0; i < allPoints.length - 1; i++) {
         const result = await getRouteDistance(
             allPoints[i].lat, allPoints[i].lng,
-            allPoints[i + 1].lat, allPoints[i + 1].lng
+            allPoints[i + 1].lat, allPoints[i + 1].lng,
+            apiKey
         );
         
         const distance = result ? result.distance : 0;
@@ -141,4 +183,25 @@ async function calculateRouteStats(pharmacy, route) {
         totalDuration: Math.round(totalDuration / 60), // en minutes
         steps: steps
     };
+}
+
+// Trouver la commande la plus proche d'un point donné
+function findClosestOrder(lat, lng, orders) {
+    if (orders.length === 0) return null;
+    
+    let closest = null;
+    let minDistance = Infinity;
+    
+    orders.forEach(order => {
+        const dx = order.lng - lng;
+        const dy = order.lat - lat;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < minDistance) {
+            minDistance = distance;
+            closest = order;
+        }
+    });
+    
+    return closest;
 }
