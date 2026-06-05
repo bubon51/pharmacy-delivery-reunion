@@ -1,3 +1,4 @@
+/* Styles généraux */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
@@ -119,6 +120,10 @@ body {
     align-items: center;
     font-size: 0.8rem;
     margin-right: 10px;
+}
+
+.modal-content {
+    border-radius: 8px;
 }
 
 @media (max-width: 768px) {
