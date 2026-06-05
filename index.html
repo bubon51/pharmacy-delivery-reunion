@@ -3,24 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pharmacy Delivery Réunion - Optimisation de tournées</title>
+    <title>Pharmacy Delivery Réunion</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Bootstrap pour le design -->
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome pour les icônes -->
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Notre CSS personnalisé -->
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
-            <!-- Barre latérale (liste des commandes) -->
+            <!-- Sidebar -->
             <div class="col-md-4 sidebar">
-                <h1 class="text-center my-4">
-                    <i class="fas fa-truck-medical"></i> Pharmacy Delivery Réunion
-                </h1>
+                <h1 class="text-center my-4"><i class="fas fa-truck-medical"></i> Pharmacy Delivery</h1>
                 <div class="card mb-4">
                     <div class="card-header bg-primary text-white">
                         <h5><i class="fas fa-plus"></i> Ajouter une commande</h5>
@@ -37,12 +35,12 @@
                                 <div id="addressSuggestions" class="list-group mt-2" style="display: none;"></div>
                             </div>
                             <div class="mb-3">
-                                <label for="phone" class="form-label">Téléphone (optionnel)</label>
+                                <label for="phone" class="form-label">Téléphone</label>
                                 <input type="tel" class="form-control" id="phone">
                             </div>
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="priority">
-                                <label class="form-check-label" for="priority">Commande urgente</label>
+                                <label class="form-check-label" for="priority">Urgente</label>
                             </div>
                             <button type="submit" class="btn btn-success w-100">
                                 <i class="fas fa-save"></i> Ajouter
@@ -50,38 +48,36 @@
                         </form>
                     </div>
                 </div>
-
                 <div class="card">
                     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                        <h5><i class="fas fa-list"></i> Commandes en attente</h5>
+                        <h5><i class="fas fa-list"></i> Commandes</h5>
                         <button id="optimizeRouteBtn" class="btn btn-sm btn-light">
-                            <i class="fas fa-route"></i> Optimiser la tournée
+                            <i class="fas fa-route"></i> Optimiser
                         </button>
                     </div>
                     <div class="card-body">
-                        <div id="ordersList" class="orders-container"></div>
+                        <div id="ordersList"></div>
                     </div>
                 </div>
             </div>
-
-            <!-- Carte (partie principale) -->
+            <!-- Map -->
             <div class="col-md-8 map-container">
                 <div id="map"></div>
                 <div id="routeSteps" class="route-steps">
-                    <h5><i class="fas fa-map-marked-alt"></i> Itinéraire optimisé</h5>
+                    <h5><i class="fas fa-map-marked-alt"></i> Itinéraire</h5>
                     <div id="stepsList"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal pour les erreurs -->
-    <div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+    <!-- Error Modal -->
+    <div class="modal fade" id="errorModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-danger text-white">
                     <h5 class="modal-title">Erreur</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="errorMessage"></div>
                 <div class="modal-footer">
@@ -92,13 +88,308 @@
     </div>
 
     <!-- Scripts -->
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Nos scripts -->
-    <script src="data.js"></script>
-    <script src="map.js"></script>
-    <script src="app.js"></script>
+    <script>
+        // ===== DONNÉES =====
+        const pharmacy = {
+            name: "Pharmacie de Saint-Suzanne",
+            address: "133 avenue du Mahatma Gandhi, 97441 Saint-Suzanne",
+            lat: -20.9286,
+            lng: 55.6142
+        };
+        let orders = JSON.parse(localStorage.getItem('orders')) || [];
+
+        // ===== FONCTIONS DE BASE =====
+        function saveOrders() {
+            localStorage.setItem('orders', JSON.stringify(orders));
+        }
+
+        async function searchAddress(query) {
+            if (!query || query.length < 3) return [];
+            try {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)},La Réunion&limit=5`
+                );
+                const data = await response.json();
+                return data.map(item => ({
+                    address: item.display_name,
+                    lat: parseFloat(item.lat),
+                    lng: parseFloat(item.lon)
+                }));
+            } catch (error) {
+                console.error("Erreur Nominatim:", error);
+                return [];
+            }
+        }
+
+        // ===== CARTE =====
+        let map;
+        let markers = [];
+        let polyline;
+
+        function initMap() {
+            map = L.map('map').setView([pharmacy.lat, pharmacy.lng], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Ajouter le marqueur de la pharmacie
+            L.marker([pharmacy.lat, pharmacy.lng])
+                .addTo(map)
+                .bindPopup(`<b>${pharmacy.name}</b><br>${pharmacy.address}`);
+        }
+
+        function updateMap() {
+            // Effacer tous les marqueurs sauf la pharmacie
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+
+            // Ajouter les marqueurs des commandes
+            orders.forEach((order, index) => {
+                const marker = L.marker([order.lat, order.lng])
+                    .addTo(map)
+                    .bindPopup(`<b>${index+1}. ${order.customerName}</b><br>${order.address}`);
+                markers.push(marker);
+            });
+
+            // Dessiner l'itinéraire
+            if (orders.length > 0) {
+                if (polyline) map.removeLayer(polyline);
+                const routePoints = [
+                    [pharmacy.lat, pharmacy.lng],
+                    ...orders.map(o => [o.lat, o.lng])
+                ];
+                polyline = L.polyline(routePoints, {color: 'blue', weight: 5}).addTo(map);
+                map.fitBounds(routePoints);
+            } else {
+                map.setView([pharmacy.lat, pharmacy.lng], 13);
+            }
+        }
+
+        // ===== INTERFACE =====
+        function renderOrders() {
+            const container = document.getElementById('ordersList');
+            container.innerHTML = orders.length === 0
+                ? '<div class="text-center text-muted py-3">Aucune commande</div>'
+                : orders.map((order, index) => `
+                    <div class="card order-card ${order.priority ? 'urgent' : ''} mb-2">
+                        <div class="card-body">
+                            <h5 class="card-title">${order.customerName}</h5>
+                            <p class="card-text">${order.address}</p>
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">
+                                    ${order.status === 'pending' ? 'En attente' :
+                                      order.status === 'in_progress' ? 'En cours' : 'Livrée'}
+                                </small>
+                                <div>
+                                    ${order.status === 'pending' ?
+                                        `<button class="btn btn-sm btn-outline-primary me-2" onclick="updateStatus('${order.id}', 'in_progress')">
+                                            <i class="fas fa-play"></i> Démarrer
+                                        </button>` : ''}
+                                    ${order.status === 'in_progress' ?
+                                        `<button class="btn btn-sm btn-outline-success me-2" onclick="updateStatus('${order.id}', 'delivered')">
+                                            <i class="fas fa-check"></i> Livrée
+                                        </button>` : ''}
+                                    <button class="btn btn-sm btn-danger" onclick="confirmDelete('${order.id}', '${order.customerName}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        function renderRouteSteps() {
+            const container = document.getElementById('stepsList');
+            container.innerHTML = orders.length === 0
+                ? '<div class="text-center text-muted py-2">Aucune tournée</div>'
+                : `
+                    <div class="step-item">
+                        <div class="d-flex align-items-center">
+                            <div class="step-number">1</div>
+                            <div>
+                                <strong>${pharmacy.name}</strong><br>
+                                <small>${pharmacy.address}</small>
+                            </div>
+                        </div>
+                        <button class="btn-waze" onclick="openWaze(${pharmacy.lat}, ${pharmacy.lng})">
+                            <i class="fas fa-directions"></i> Waze
+                        </button>
+                    </div>
+                    ${orders.map((order, index) => `
+                        <div class="step-item">
+                            <div class="d-flex align-items-center">
+                                <div class="step-number">${index+2}</div>
+                                <div>
+                                    <strong>${order.customerName}</strong><br>
+                                    <small>${order.address}</small>
+                                </div>
+                            </div>
+                            <button class="btn-waze" onclick="openWaze(${order.lat}, ${order.lng})">
+                                <i class="fas fa-directions"></i> Waze
+                            </button>
+                        </div>
+                    `).join('')}
+                `;
+        }
+
+        // ===== ACTIONS =====
+        function addOrder(customerName, address, lat, lng, phone, priority) {
+            const newOrder = {
+                id: Date.now().toString(),
+                customerName,
+                address,
+                lat,
+                lng,
+                phone: phone || null,
+                priority,
+                status: 'pending'
+            };
+            orders.push(newOrder);
+            saveOrders();
+            renderOrders();
+            updateMap();
+        }
+
+        function updateStatus(orderId, newStatus) {
+            orders = orders.map(order =>
+                order.id === orderId ? {...order, status: newStatus} : order
+            );
+            saveOrders();
+            renderOrders();
+        }
+
+        function confirmDelete(orderId, customerName) {
+            if (confirm(`Supprimer la commande de ${customerName} ?`)) {
+                orders = orders.filter(order => order.id !== orderId);
+                saveOrders();
+                renderOrders();
+                updateMap();
+            }
+        }
+
+        function optimizeRoute() {
+            // Algorithme du plus proche voisin
+            const route = [];
+            let currentLat = pharmacy.lat;
+            let currentLng = pharmacy.lng;
+            const remaining = [...orders];
+
+            while (remaining.length > 0) {
+                const nearestIndex = remaining.findIndex(order => {
+                    const d = Math.sqrt(
+                        Math.pow(order.lat - currentLat, 2) +
+                        Math.pow(order.lng - currentLng, 2)
+                    );
+                    return d === Math.min(...remaining.map(o =>
+                        Math.sqrt(
+                            Math.pow(o.lat - currentLat, 2) +
+                            Math.pow(o.lng - currentLng, 2)
+                        )
+                    ));
+                });
+
+                if (nearestIndex !== -1) {
+                    route.push(remaining[nearestIndex]);
+                    currentLat = remaining[nearestIndex].lat;
+                    currentLng = remaining[nearestIndex].lng;
+                    remaining.splice(nearestIndex, 1);
+                }
+            }
+
+            orders = route;
+            saveOrders();
+            renderOrders();
+            updateMap();
+            renderRouteSteps();
+        }
+
+        function openWaze(lat, lng) {
+            window.open(`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
+        }
+
+        function showError(message) {
+            const modal = new bootstrap.Modal(document.getElementById('errorModal'));
+            document.getElementById('errorMessage').textContent = message;
+            modal.show();
+        }
+
+        // ===== INITIALISATION =====
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            renderOrders();
+
+            // Formulaire d'ajout
+            document.getElementById('addOrderForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const customerName = document.getElementById('customerName').value.trim();
+                const address = document.getElementById('address').value.trim();
+                const phone = document.getElementById('phone').value.trim();
+                const priority = document.getElementById('priority').checked ? 1 : 0;
+
+                if (!customerName || !address) {
+                    showError("Veuillez remplir tous les champs obligatoires.");
+                    return;
+                }
+
+                const suggestions = await searchAddress(address);
+                let lat, lng;
+
+                if (suggestions.length > 0) {
+                    lat = suggestions[0].lat;
+                    lng = suggestions[0].lng;
+                } else {
+                    showError("Adresse non trouvée. Coordonnées par défaut utilisées.");
+                    lat = -20.9286;
+                    lng = 55.6142;
+                }
+
+                addOrder(customerName, address, lat, lng, phone, priority);
+                document.getElementById('addOrderForm').reset();
+                document.getElementById('addressSuggestions').style.display = 'none';
+            });
+
+            // Autocomplétion des adresses
+            document.getElementById('address').addEventListener('input', async (e) => {
+                const query = e.target.value.trim();
+                if (query.length < 3) {
+                    document.getElementById('addressSuggestions').style.display = 'none';
+                    return;
+                }
+
+                const suggestions = await searchAddress(query);
+                const container = document.getElementById('addressSuggestions');
+
+                if (suggestions.length > 0) {
+                    container.innerHTML = suggestions.map(s => `
+                        <div class="list-group-item" onclick="selectAddress('${s.address}', ${s.lat}, ${s.lng})">
+                            ${s.address}
+                        </div>
+                    `).join('');
+                    container.style.display = 'block';
+                } else {
+                    container.style.display = 'none';
+                }
+            });
+
+            // Sélection d'une adresse depuis les suggestions
+            window.selectAddress = function(address, lat, lng) {
+                document.getElementById('address').value = address;
+                document.getElementById('addressSuggestions').style.display = 'none';
+            };
+
+            // Optimisation de la tournée
+            document.getElementById('optimizeRouteBtn').addEventListener('click', optimizeRoute);
+
+            // Masquer les suggestions en cliquant ailleurs
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#address') && !e.target.closest('#addressSuggestions')) {
+                    document.getElementById('addressSuggestions').style.display = 'none';
+                }
+            });
+        });
+    </script>
 </body>
 </html>
