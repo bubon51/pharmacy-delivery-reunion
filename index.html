@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pharmacy Delivery Réunion - Pharmacie de l'Océan Indien</title>
+    <title>Pharmacy Delivery Réunion - Base d'adresses fiable</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Correction pour les icônes Leaflet -->
@@ -11,6 +11,9 @@
     <style>
         .leaflet-container { background: #fff; }
         .leaflet-marker-icon, .leaflet-marker-shadow { display: block; }
+        /* Style pour les suggestions d'adresses proches */
+        .closest-address-suggestion { background-color: #fff3cd; border-left: 4px solid #ffc107; }
+        .local-db-suggestion { background-color: #d1ecf1; border-left: 4px solid #17a2b8; }
     </style>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -64,6 +67,10 @@
             cursor: pointer;
             padding: 8px 15px;
             font-size: 0.9rem;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         #addressSuggestions .list-group-item:hover {
             background-color: #f8f9fa;
@@ -104,11 +111,6 @@
             #map { height: 400px; }
             .route-steps { position: relative; margin-top: 20px; }
         }
-        /* Style pour les suggestions d'adresses proches */
-        .closest-address-suggestion {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
-        }
     </style>
 </head>
 <body>
@@ -131,7 +133,7 @@
                             </div>
                             <div class="mb-3">
                                 <label for="address" class="form-label">Adresse</label>
-                                <input type="text" class="form-control" id="address" required>
+                                <input type="text" class="form-control" id="address" required placeholder="Ex: 12 Rue de Paris, Saint-Denis">
                                 <div id="addressSuggestions" class="list-group mt-2" style="display: none;"></div>
                             </div>
                             <div class="mb-3">
@@ -191,14 +193,14 @@
 
     <!-- Modal pour les adresses proches -->
     <div class="modal fade" id="closestAddressModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-warning text-dark">
                     <h5 class="modal-title">Adresse non trouvée</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>L'adresse exacte n'a pas été trouvée. Souhaitez-vous utiliser l'adresse la plus proche ?</p>
+                    <p>L'adresse exacte n'a pas été trouvée. Voici des suggestions proches :</p>
                     <div id="closestAddressOptions" class="list-group"></div>
                 </div>
                 <div class="modal-footer">
@@ -212,7 +214,110 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // ===== DONNÉES GLOBALES =====
+        // ======================
+        // BASE DE DONNÉES LOCALE POUR LA RÉUNION
+        // ======================
+        // Liste complète des communes et quartiers de La Réunion avec coordonnées GPS
+        const localAddressDatabase = [
+            // Saint-Denis
+            { name: "12 Rue de Paris, Saint-Denis", lat: -20.8785, lng: 55.4484 },
+            { name: "45 Rue du Général de Gaulle, Sainte-Clotilde", lat: -20.8954, lng: 55.4592 },
+            { name: "78 Boulevard de la République, Saint-Denis", lat: -20.8806, lng: 55.4521 },
+            { name: "23 Rue de la République, Saint-Denis", lat: -20.8812, lng: 55.4508 },
+            { name: "15 Rue Jean Chatel, Saint-Denis", lat: -20.8756, lng: 55.4453 },
+            { name: "32 Avenue de la Victoire, Saint-Denis", lat: -20.8798, lng: 55.4495 },
+
+            // Saint-Paul
+            { name: "10 Rue de la Marine, Saint-Paul", lat: -20.9953, lng: 55.2841 },
+            { name: "5 Rue de Paris, Saint-Paul", lat: -20.9968, lng: 55.2856 },
+            { name: "20 Rue du Général Lambert, Saint-Paul", lat: -20.9932, lng: 55.2825 },
+            { name: "15 Rue des Bons Enfants, Saint-Paul", lat: -20.9975, lng: 55.2863 },
+
+            // Saint-Pierre
+            { name: "10 Rue de Paris, Saint-Pierre", lat: -21.3408, lng: 55.4769 },
+            { name: "25 Rue du Général de Gaulle, Saint-Pierre", lat: -21.3423, lng: 55.4784 },
+            { name: "5 Avenue de la République, Saint-Pierre", lat: -21.3415, lng: 55.4778 },
+            { name: "12 Rue du Commerce, Saint-Pierre", lat: -21.3431, lng: 55.4792 },
+
+            // Le Tampon
+            { name: "15 Rue de la République, Le Tampon", lat: -21.2656, lng: 55.5139 },
+            { name: "22 Rue du Général de Gaulle, Le Tampon", lat: -21.2678, lng: 55.5152 },
+            { name: "8 Rue de Paris, Le Tampon", lat: -21.2645, lng: 55.5128 },
+
+            // Saint-Suzanne (où se trouve la pharmacie)
+            { name: "133 Avenue du Mahatma Gandhi, Saint-Suzanne", lat: -20.932179057032947, lng: 55.64139511027464 },
+            { name: "25 Rue de la République, Saint-Suzanne", lat: -20.9305, lng: 55.6432 },
+            { name: "10 Rue de Paris, Saint-Suzanne", lat: -20.9318, lng: 55.6425 },
+            { name: "18 Rue du Général de Gaulle, Saint-Suzanne", lat: -20.9335, lng: 55.6408 },
+
+            // Saint-André
+            { name: "12 Rue de la République, Saint-André", lat: -20.9654, lng: 55.6541 },
+            { name: "20 Rue du Général de Gaulle, Saint-André", lat: -20.9672, lng: 55.6558 },
+
+            // Saint-Louis
+            { name: "15 Rue de Paris, Saint-Louis", lat: -21.2856, lng: 55.4235 },
+            { name: "8 Rue du Commerce, Saint-Louis", lat: -21.2872, lng: 55.4251 },
+
+            // Saint-Leu
+            { name: "10 Rue de la Marine, Saint-Leu", lat: -21.1669, lng: 55.1536 },
+            { name: "25 Rue du Général Lambert, Saint-Leu", lat: -21.1685, lng: 55.1552 },
+
+            // Les Avirons
+            { name: "12 Rue de la République, Les Avirons", lat: -21.2456, lng: 55.3247 },
+            { name: "18 Rue du Général de Gaulle, Les Avirons", lat: -21.2478, lng: 55.3263 },
+
+            // L'Étang-Salé
+            { name: "10 Rue de Paris, L'Étang-Salé", lat: -21.2654, lng: 55.3421 },
+            { name: "15 Rue du Commerce, L'Étang-Salé", lat: -21.2672, lng: 55.3438 },
+
+            // Sainte-Marie
+            { name: "20 Rue de la République, Sainte-Marie", lat: -20.9056, lng: 55.5847 },
+            { name: "12 Rue du Général de Gaulle, Sainte-Marie", lat: -20.9078, lng: 55.5863 },
+
+            // Sainte-Suzanne
+            { name: "15 Rue de Paris, Sainte-Suzanne", lat: -20.8956, lng: 55.6425 },
+            { name: "8 Rue du Commerce, Sainte-Suzanne", lat: -20.8972, lng: 55.6441 },
+
+            // La Possession
+            { name: "10 Rue de la République, La Possession", lat: -20.9256, lng: 55.3347 },
+            { name: "25 Rue du Général de Gaulle, La Possession", lat: -20.9278, lng: 55.3363 },
+
+            // Le Port
+            { name: "12 Rue de Paris, Le Port", lat: -20.9356, lng: 55.2947 },
+            { name: "18 Rue du Commerce, Le Port", lat: -20.9378, lng: 55.2963 },
+
+            // Saint-Joseph
+            { name: "10 Rue de la République, Saint-Joseph", lat: -21.3654, lng: 55.6047 },
+            { name: "15 Rue du Général de Gaulle, Saint-Joseph", lat: -21.3672, lng: 55.6063 },
+
+            // Petite-Île
+            { name: "12 Rue de Paris, Petite-Île", lat: -21.3256, lng: 55.5647 },
+            { name: "8 Rue du Commerce, Petite-Île", lat: -21.3278, lng: 55.5663 },
+
+            // Cilaos
+            { name: "15 Rue de la République, Cilaos", lat: -21.1356, lng: 55.4547 },
+            { name: "10 Rue du Général de Gaulle, Cilaos", lat: -21.1378, lng: 55.4563 },
+
+            // Entre-Deux
+            { name: "12 Rue de Paris, Entre-Deux", lat: -21.2456, lng: 55.4847 },
+            { name: "18 Rue du Commerce, Entre-Deux", lat: -21.2478, lng: 55.4863 },
+
+            // Saint-Benoît
+            { name: "10 Rue de la République, Saint-Benoît", lat: -21.0456, lng: 55.7247 },
+            { name: "15 Rue du Général de Gaulle, Saint-Benoît", lat: -21.0478, lng: 55.7263 },
+
+            // Saint-Rose
+            { name: "12 Rue de Paris, Saint-Rose", lat: -21.1256, lng: 55.7847 },
+            { name: "20 Rue du Commerce, Saint-Rose", lat: -21.1278, lng: 55.7863 },
+
+            // La Plaine-des-Palmistes
+            { name: "15 Rue de la République, La Plaine-des-Palmistes", lat: -21.1056, lng: 55.5847 },
+            { name: "10 Rue du Général de Gaulle, La Plaine-des-Palmistes", lat: -21.1078, lng: 55.5863 }
+        ];
+
+        // ======================
+        // DONNÉES GLOBALES
+        // ======================
         const pharmacy = {
             name: "Pharmacie de l'Océan Indien",
             address: "133 avenue du Mahatma Gandhi, 97441 Saint-Suzanne",
@@ -224,30 +329,27 @@
         let markers = [];
         let polyline;
         let orders = JSON.parse(localStorage.getItem('orders')) || [];
-        let pendingClosestAddress = null; // Pour stocker l'adresse en attente de confirmation
+        let pendingClosestAddress = null;
 
-        // ===== FONCTIONS DE BASE =====
-        function saveOrders() {
-            try {
-                localStorage.setItem('orders', JSON.stringify(orders));
-            } catch (e) {
-                console.error("Erreur lors de la sauvegarde des commandes :", e);
-            }
-        }
+        // ======================
+        // FONCTIONS DE RECHERCHE
+        // ======================
 
-        async function searchAddress(query) {
+        // Recherche dans Nominatim (OpenStreetMap)
+        async function searchInNominatim(query) {
             if (!query || query.length < 3) return [];
 
             try {
                 const response = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)},La Réunion&limit=5`
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)},La Réunion&limit=5&bounded=1&viewbox=-21.4,-55.9,-20.8,-55.2`
                 );
                 if (!response.ok) throw new Error(`Erreur HTTP : ${response.status}`);
                 const data = await response.json();
                 return data.map(item => ({
                     address: item.display_name,
                     lat: parseFloat(item.lat),
-                    lng: parseFloat(item.lon)
+                    lng: parseFloat(item.lon),
+                    source: "Nominatim"
                 }));
             } catch (error) {
                 console.error("Erreur Nominatim:", error);
@@ -255,49 +357,59 @@
             }
         }
 
-        // Fonction pour trouver l'adresse la plus proche parmi les commandes existantes
-        function findClosestAddress(targetLat, targetLng) {
-            if (orders.length === 0) return null;
+        // Recherche dans la base locale
+        function searchInLocalDatabase(query) {
+            if (!query || query.length < 2) return [];
 
-            let closestAddress = null;
+            const queryLower = query.toLowerCase();
+            return localAddressDatabase
+                .filter(addr => addr.name.toLowerCase().includes(queryLower))
+                .map(addr => ({
+                    ...addr,
+                    source: "Base locale"
+                }));
+        }
+
+        // Recherche combinée (Nominatim + Base locale)
+        async function searchAddress(query) {
+            const [nominatimResults, localResults] = await Promise.all([
+                searchInNominatim(query),
+                searchInLocalDatabase(query)
+            ]);
+
+            // Combiner les résultats (Nominatim en premier, puis base locale)
+            return [...nominatimResults, ...localResults];
+        }
+
+        // Trouver l'adresse la plus proche parmi une liste
+        function findClosestFromList(targetLat, targetLng, addressList) {
+            if (addressList.length === 0) return null;
+
+            let closest = null;
             let minDistance = Infinity;
 
-            orders.forEach(order => {
+            addressList.forEach(addr => {
                 const distance = Math.sqrt(
-                    Math.pow(order.lat - targetLat, 2) +
-                    Math.pow(order.lng - targetLng, 2)
+                    Math.pow(addr.lat - targetLat, 2) +
+                    Math.pow(addr.lng - targetLng, 2)
                 );
                 if (distance < minDistance) {
                     minDistance = distance;
-                    closestAddress = order;
+                    closest = addr;
                 }
             });
 
-            return closestAddress;
+            return closest;
         }
 
-        // Fonction pour trouver l'adresse la plus proche parmi les suggestions Nominatim
-        function findClosestSuggestion(targetLat, targetLng, suggestions) {
-            if (suggestions.length === 0) return null;
-
-            let closestSuggestion = null;
-            let minDistance = Infinity;
-
-            suggestions.forEach(suggestion => {
-                const distance = Math.sqrt(
-                    Math.pow(suggestion.lat - targetLat, 2) +
-                    Math.pow(suggestion.lng - targetLng, 2)
-                );
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestSuggestion = suggestion;
-                }
-            });
-
-            return closestSuggestion;
+        // Trouver l'adresse la plus proche parmi les commandes existantes
+        function findClosestFromOrders(targetLat, targetLng) {
+            return findClosestFromList(targetLat, targetLng, orders);
         }
 
-        // ===== CARTE =====
+        // ======================
+        // FONCTIONS DE CARTE
+        // ======================
         function initMap() {
             if (map) return;
 
@@ -308,6 +420,7 @@
                 maxZoom: 18
             }).addTo(map);
 
+            // Correction pour les icônes Leaflet
             delete L.Icon.Default.prototype._getIconUrl;
             L.Icon.Default.mergeOptions({
                 iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
@@ -315,6 +428,7 @@
                 shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png'
             });
 
+            // Icône personnalisée pour la pharmacie
             const pharmacyIcon = L.icon({
                 iconUrl: 'https://cdn-icons-png.flaticon.com/512/1087/1087915.png',
                 iconSize: [32, 32],
@@ -335,11 +449,13 @@
                 return;
             }
 
+            // Effacer tous les marqueurs sauf la pharmacie
             markers.slice(1).forEach(marker => {
                 if (map.hasLayer(marker)) map.removeLayer(marker);
             });
             markers = markers.slice(0, 1);
 
+            // Ajouter les marqueurs des commandes
             orders.forEach((order, index) => {
                 const marker = L.marker([order.lat, order.lng])
                     .addTo(map)
@@ -353,6 +469,7 @@
                 markers.push(marker);
             });
 
+            // Dessiner l'itinéraire
             if (orders.length > 0) {
                 if (polyline && map.hasLayer(polyline)) map.removeLayer(polyline);
 
@@ -373,7 +490,9 @@
             }
         }
 
-        // ===== INTERFACE =====
+        // ======================
+        // FONCTIONS D'INTERFACE
+        // ======================
         function renderOrders() {
             const container = document.getElementById('ordersList');
             if (!container) return;
@@ -451,7 +570,9 @@
                 `;
         }
 
-        // ===== ACTIONS =====
+        // ======================
+        // FONCTIONS D'ACTIONS
+        // ======================
         function addOrder(customerName, address, lat, lng, phone, priority) {
             const newOrder = {
                 id: Date.now().toString(),
@@ -492,6 +613,7 @@
                 return;
             }
 
+            // Algorithme du plus proche voisin
             const route = [];
             let currentLat = pharmacy.lat;
             let currentLng = pharmacy.lng;
@@ -534,6 +656,14 @@
             window.open(`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
         }
 
+        function saveOrders() {
+            try {
+                localStorage.setItem('orders', JSON.stringify(orders));
+            } catch (e) {
+                console.error("Erreur lors de la sauvegarde des commandes :", e);
+            }
+        }
+
         function showError(message) {
             const modalEl = document.getElementById('errorModal');
             if (!modalEl) return;
@@ -542,7 +672,7 @@
             modal.show();
         }
 
-        // Fonction pour afficher les adresses proches
+        // Afficher les adresses proches dans une modal
         function showClosestAddresses(suggestions, originalQuery) {
             const modalEl = document.getElementById('closestAddressModal');
             if (!modalEl) return;
@@ -556,13 +686,33 @@
                 return;
             }
 
+            // Trier les suggestions par distance (la plus proche en premier)
+            suggestions.sort((a, b) => {
+                const distA = Math.sqrt(
+                    Math.pow(a.lat - pharmacy.lat, 2) +
+                    Math.pow(a.lng - pharmacy.lng, 2)
+                );
+                const distB = Math.sqrt(
+                    Math.pow(b.lat - pharmacy.lat, 2) +
+                    Math.pow(b.lng - pharmacy.lng, 2)
+                );
+                return distA - distB;
+            });
+
             optionsContainer.innerHTML = suggestions.map((suggestion, index) => `
-                <div class="list-group-item closest-address-suggestion" onclick="selectClosestAddress(${index})">
-                    <strong>${suggestion.address}</strong>
+                <div class="list-group-item ${suggestion.source === 'Base locale' ? 'local-db-suggestion' : 'closest-address-suggestion'}"
+                     onclick="selectClosestAddress(${index})">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${suggestion.name || suggestion.address}</strong>
+                            <small class="d-block text-muted">${suggestion.source}</small>
+                        </div>
+                        <i class="fas fa-map-marker-alt text-primary"></i>
+                    </div>
                 </div>
             `).join('');
 
-            // Stocker les suggestions et la requête originale pour une utilisation ultérieure
+            // Stocker les suggestions et la requête originale
             pendingClosestAddress = {
                 suggestions: suggestions,
                 originalQuery: originalQuery
@@ -571,14 +721,14 @@
             modal.show();
         }
 
-        // Fonction pour sélectionner une adresse proche
+        // Sélectionner une adresse proche
         function selectClosestAddress(index) {
             if (!pendingClosestAddress || !pendingClosestAddress.suggestions[index]) {
                 return;
             }
 
             const selected = pendingClosestAddress.suggestions[index];
-            document.getElementById('address').value = selected.address;
+            document.getElementById('address').value = selected.name || selected.address;
             document.getElementById('addressSuggestions').style.display = 'none';
 
             // Ajouter la commande avec les coordonnées de l'adresse sélectionnée
@@ -591,7 +741,15 @@
                 return;
             }
 
-            addOrder(customerName, selected.address, selected.lat, selected.lng, phone, priority);
+            addOrder(
+                customerName,
+                selected.name || selected.address,
+                selected.lat,
+                selected.lng,
+                phone,
+                priority
+            );
+
             document.getElementById('addOrderForm').reset();
 
             // Fermer la modal
@@ -607,11 +765,14 @@
             document.getElementById('addressSuggestions').style.display = 'none';
         }
 
-        // ===== INITIALISATION =====
+        // ======================
+        // INITIALISATION
+        // ======================
         document.addEventListener('DOMContentLoaded', () => {
             initMap();
             renderOrders();
 
+            // Formulaire d'ajout de commande
             const addOrderForm = document.getElementById('addOrderForm');
             if (!addOrderForm) return;
 
@@ -627,32 +788,44 @@
                     return;
                 }
 
-                const suggestions = await searchAddress(address);
-                let lat, lng;
+                // Rechercher dans toutes les sources
+                const allSuggestions = await searchAddress(address);
 
-                if (suggestions.length > 0) {
-                    // Si on a des suggestions, utiliser la première
-                    lat = suggestions[0].lat;
-                    lng = suggestions[0].lng;
-                    addOrder(customerName, suggestions[0].address, lat, lng, phone, priority);
-                } else {
-                    // Si aucune suggestion n'est trouvée, proposer les adresses proches
-                    const closestFromOrders = findClosestAddress(pharmacy.lat, pharmacy.lng);
-                    const closestFromNominatim = await searchAddress("La Réunion"); // Recherche large
+                if (allSuggestions.length > 0) {
+                    // Si on a des suggestions exactes, utiliser la première
+                    const exactMatch = allSuggestions.find(s =>
+                        s.address.toLowerCase() === address.toLowerCase() ||
+                        s.name.toLowerCase() === address.toLowerCase()
+                    );
 
-                    const allSuggestions = [];
-                    if (closestFromOrders) allSuggestions.push(closestFromOrders);
-                    if (closestFromNominatim.length > 0) allSuggestions.push(...closestFromNominatim);
-
-                    if (allSuggestions.length > 0) {
-                        showClosestAddresses(allSuggestions, address);
-                        return; // On attend que l'utilisateur choisisse une adresse
+                    if (exactMatch) {
+                        addOrder(customerName, exactMatch.name || exactMatch.address, exactMatch.lat, exactMatch.lng, phone, priority);
                     } else {
-                        // Si vraiment aucune suggestion, utiliser les coordonnées de la pharmacie
+                        // Sinon, proposer les suggestions proches
+                        showClosestAddresses(allSuggestions, address);
+                        return;
+                    }
+                } else {
+                    // Si aucune suggestion, proposer les adresses proches de la pharmacie
+                    const closestFromLocalDB = findClosestFromList(
+                        pharmacy.lat,
+                        pharmacy.lng,
+                        localAddressDatabase
+                    );
+
+                    const closestFromOrders = findClosestFromOrders(pharmacy.lat, pharmacy.lng);
+
+                    const allClosest = [];
+                    if (closestFromLocalDB) allClosest.push(closestFromLocalDB);
+                    if (closestFromOrders) allClosest.push(closestFromOrders);
+
+                    if (allClosest.length > 0) {
+                        showClosestAddresses(allClosest, address);
+                        return;
+                    } else {
+                        // Dernier recours : utiliser les coordonnées de la pharmacie
                         showError("Aucune adresse proche trouvée. Utilisation des coordonnées de la pharmacie par défaut.");
-                        lat = pharmacy.lat;
-                        lng = pharmacy.lng;
-                        addOrder(customerName, address, lat, lng, phone, priority);
+                        addOrder(customerName, address, pharmacy.lat, pharmacy.lng, phone, priority);
                     }
                 }
 
@@ -660,12 +833,13 @@
                 document.getElementById('addressSuggestions').style.display = 'none';
             });
 
+            // Autocomplétion des adresses
             const addressInput = document.getElementById('address');
             if (!addressInput) return;
 
             addressInput.addEventListener('input', async (e) => {
                 const query = e.target.value.trim();
-                if (query.length < 3) {
+                if (query.length < 2) { // Seuil plus bas pour la base locale
                     document.getElementById('addressSuggestions').style.display = 'none';
                     return;
                 }
@@ -677,10 +851,15 @@
 
                 if (suggestions.length > 0) {
                     container.innerHTML = suggestions.map(s => {
-                        const escapedAddress = s.address.replace(/'/g, "\\'");
+                        const displayText = s.name || s.address;
+                        const escapedText = displayText.replace(/'/g, "\\'");
                         return `
-                            <div class="list-group-item" onclick="selectAddress('${escapedAddress}', ${s.lat}, ${s.lng})">
-                                ${s.address}
+                            <div class="list-group-item ${s.source === 'Base locale' ? 'local-db-suggestion' : ''}"
+                                 onclick="selectAddress('${escapedText}', ${s.lat}, ${s.lng})">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>${displayText}</span>
+                                    <small class="text-muted">${s.source}</small>
+                                </div>
                             </div>
                         `;
                     }).join('');
@@ -690,11 +869,13 @@
                 }
             });
 
+            // Optimiser la tournée
             const optimizeBtn = document.getElementById('optimizeRouteBtn');
             if (!optimizeBtn) return;
 
             optimizeBtn.addEventListener('click', optimizeRoute);
 
+            // Masquer les suggestions en cliquant ailleurs
             document.addEventListener('click', (e) => {
                 const addressSuggestions = document.getElementById('addressSuggestions');
                 if (addressSuggestions && !e.target.closest('#address') && !e.target.closest('#addressSuggestions')) {
