@@ -655,10 +655,28 @@ function setupEventListeners() {
             // Si on a des suggestions, utiliser la première
             addOrderToList(customerName, suggestions[0].address, suggestions[0].lat, suggestions[0].lng, phone, priority);
         } else {
-            // Essayer une recherche plus large avec Google Maps
-            const googleResult = await searchAddressWithGoogle(address + ', La Réunion', GOOGLE_MAPS_API_KEY);
-            if (googleResult.length > 0) {
-                addOrderToList(customerName, googleResult[0].address, googleResult[0].lat, googleResult[0].lng, phone, priority);
+            // Essayer une recherche directe sur Google Maps sans restriction géographique
+            const directGoogleResults = await searchAddressDirectGoogle(address, GOOGLE_MAPS_API_KEY);
+            if (directGoogleResults.length > 0) {
+                const result = directGoogleResults[0];
+                
+                // Vérifier si l'adresse est à La Réunion
+                const isInReunion = result.lat >= -21.4 && result.lat <= -20.8 && 
+                                   result.lng >= 55.2 && result.lng <= 55.9;
+                
+                if (isInReunion) {
+                    // Intégrer directement si c'est à La Réunion
+                    addOrderToList(customerName, result.address, result.lat, result.lng, phone, priority);
+                } else {
+                    // Demander confirmation si l'adresse n'est pas à La Réunion
+                    if (confirm(`L'adresse "${result.address}" a été trouvée mais ne semble pas être à La Réunion.\n\nSouhaitez-vous l'ajouter quand même ?`)) {
+                        addOrderToList(customerName, result.address, result.lat, result.lng, phone, priority);
+                    } else {
+                        // Ouvrir la modal pour entrer manuellement
+                        showManualGPSModal();
+                        return;
+                    }
+                }
             } else {
                 // Sinon, proposer les adresses proches des commandes existantes
                 const closestFromOrders = findClosestOrder(PHARMACY.lat, PHARMACY.lng, window.orders);
