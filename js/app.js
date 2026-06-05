@@ -29,13 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
     updateLastUpdatedDate();
     
     // Initialiser la carte quand Google Maps API est prête
+    let googleMapsCheckCount = 0;
+    const MAX_GOOGLE_MAPS_CHECKS = 50; // 10 secondes max (200ms * 50)
     function checkGoogleMaps() {
+        googleMapsCheckCount++;
         if (typeof google !== 'undefined' && google.maps && typeof initMap === 'function') {
             console.log('Google Maps API est prête, initialisation de la carte');
             initMap();
             updateMap();
-        } else {
+        } else if (typeof L !== 'undefined' && googleMapsCheckCount >= MAX_GOOGLE_MAPS_CHECKS) {
+            console.log('Google Maps API non disponible, utilisation du fallback Leaflet');
+            initMap();
+            updateMap();
+        } else if (googleMapsCheckCount < MAX_GOOGLE_MAPS_CHECKS) {
             setTimeout(checkGoogleMaps, 200);
+        } else {
+            console.error('Aucune bibliothèque de carte disponible');
         }
     }
     
