@@ -1,0 +1,864 @@
+// ============================================
+// APPLICATION PRINCIPALE
+// ============================================
+
+// Importer la configuration
+const PHARMACY = {
+    id: 1,
+    name: "Pharmacie de Saint-Suzanne",
+    address: "133 avenue du Mahatma Gandhi, 97441 Saint-Suzanne",
+    lat: -20.932179057032947,
+    lng: 55.64139511027464
+};
+
+const REUNION_BOUNDS = [
+    [-21.4, 55.2],
+    [-20.8, 55.9]
+];
+
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc';
+
+// Variables globales
+let map;
+let markers = [];
+let polyline;
+let orders = [];
+let pendingGPSOrder = null;
+let pendingClosestAddress = null;
+
+// ============================================
+// INITIALISATION
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Charger les commandes
+    orders = loadOrders();
+    
+    // Initialiser la carte
+    initMap();
+    
+    // Rendre les commandes
+    renderOrders();
+    
+    // Configurer les écouteurs d'événements
+    setupEventListeners();
+    
+    // Initialiser les optimisations mobiles
+    if (isMobileDevice()) {
+        setupMobileOptimizations();
+    }
+});
+
+// ============================================
+// FONCTIONS DE CARTE
+// ============================================
+
+function initMap() {
+    if (map) return;
+
+    // Initialiser la carte centrée sur La Réunion
+    map = L.map('map', {
+        maxBounds: REUNION_BOUNDS,
+        maxBoundsViscosity: 1.0,
+        gestureHandling: true,
+        tap: true,
+        touchZoom: true,
+        scrollWheelZoom: !isMobileDevice()
+    }).setView([-20.8785, 55.4484], 10);
+
+    // Ajouter les tuiles OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 18
+    }).addTo(map);
+
+    // Correction pour les icônes Leaflet
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png'
+    });
+
+    // Icône personnalisée pour la pharmacie
+    const pharmacyIcon = L.icon({
+        iconUrl: 'https://cdn-icons-png.flaticon.com/512/1087/1087915.png',
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+    });
+
+    // Ajouter le marqueur de la pharmacie
+    L.marker([PHARMACY.lat, PHARMACY.lng], { icon: pharmacyIcon })
+        .addTo(map)
+        .bindPopup(`<b>${PHARMACY.name}</b><br>${PHARMACY.address}`);
+
+    markers.push(L.marker([PHARMACY.lat, PHARMACY.lng], { icon: pharmacyIcon }));
+
+    // Écouter les changements de taille de fenêtre pour mobile
+    window.addEventListener('resize', () => {
+        if (map) {
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 100);
+        }
+    });
+}
+
+function updateMap() {
+    if (!map) {
+        console.error("La carte n'est pas initialisée.");
+        return;
+    }
+
+    // Effacer tous les marqueurs sauf la pharmacie
+    markers.slice(1).forEach(marker => {
+        if (map.hasLayer(marker)) map.removeLayer(marker);
+    });
+    markers = markers.slice(0, 1); // Garder uniquement le marqueur de la pharmacie
+
+    // Ajouter les marqueurs des commandes
+    orders.forEach((order, index) => {
+        const marker = L.marker([order.lat, order.lng])
+            .addTo(map)
+            .bindPopup(`
+                <b>${index + 1}. ${order.customerName}</b><br>
+                ${order.address}<br>
+                <button onclick="openGoogleMaps(${order.lat}, ${order.lng})" class="btn-google-maps mt-2">
+                    <i class="fas fa-directions"></i> Naviguer
+                </button>
+            `);
+        markers.push(marker);
+    });
+
+    // Dessiner l'itinéraire
+    if (orders.length > 0) {
+        if (polyline && map.hasLayer(polyline)) map.removeLayer(polyline);
+
+        const routePoints = [
+            [PHARMACY.lat, PHARMACY.lng],
+            ...orders.map(o => [o.lat, o.lng])
+        ];
+
+        polyline = L.polyline(routePoints, {
+            color: 'blue',
+            weight: 5,
+            opacity: 0.7
+        }).addTo(map);
+
+        map.fitBounds(routePoints);
+    } else {
+        map.setView([PHARMACY.lat, PHARMACY.lng], 15);
+    }
+}
+
+// ============================================
+// FONCTIONS DE RENDU
+// ============================================
+
+function renderOrders() {
+    const container = document.getElementById('ordersList');
+    if (!container) return;
+
+    container.innerHTML = orders.length === 0
+        ? '<div class="text-center text-muted py-3">Aucune commande en attente</div>'
+        : orders.map((order, index) => {
+            const escapedName = order.customerName.replace(/'/g, "\\'");
+            return `
+                <div class="card order-card ${order.priority ? 'urgent' : ''} mb-2">
+                    <div class="card-body">
+                        <h5 class="card-title">${order.customerName}</h5>
+                        <p class="card-text">${order.address}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                ${order.status === 'pending' ? 'En attente' :
+                                  order.status === 'in_progress' ? 'En cours' : 'Livrée'}
+                            </small>
+                            <div>
+                                ${order.status === 'pending' ?
+                                    `<button class="btn btn-sm btn-outline-primary me-2" onclick="updateOrderStatus('${order.id}', 'in_progress')">
+                                        <i class="fas fa-play"></i> Démarrer
+                                    </button>` : ''}
+                                ${order.status === 'in_progress' ?
+                                    `<button class="btn btn-sm btn-outline-success me-2" onclick="updateOrderStatus('${order.id}', 'delivered')">
+                                        <i class="fas fa-check"></i> Livrée
+                                    </button>` : ''}
+                                <button class="btn btn-sm btn-danger" onclick="confirmDeleteOrder('${order.id}', '${escapedName}')">
+                                    <i class="fas fa-trash"></i> Supprimer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+}
+
+async function renderRouteSteps() {
+    const container = document.getElementById('stepsList');
+    if (!container) return;
+
+    if (orders.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-2">Aucune tournée optimisée</div>';
+        renderRouteStats(null);
+        return;
+    }
+
+    // Calculer les stats de la tournée
+    const stats = await calculateRouteStats(PHARMACY, orders);
+    renderRouteStats(stats);
+
+    container.innerHTML = `
+        <div class="step-item">
+            <div class="d-flex align-items-center">
+                <div class="step-number">1</div>
+                <div>
+                    <strong>${PHARMACY.name}</strong><br>
+                    <small>${PHARMACY.address}</small>
+                </div>
+            </div>
+            <button class="btn-google-maps" onclick="openGoogleMaps(${PHARMACY.lat}, ${PHARMACY.lng})">
+                <i class="fas fa-directions"></i> Google Maps
+            </button>
+        </div>
+        ${orders.map((order, index) => {
+            const escapedName = order.customerName.replace(/'/g, "\\'");
+            return `
+                <div class="step-item">
+                    <div class="d-flex align-items-center">
+                        <div class="step-number">${index + 2}</div>
+                        <div>
+                            <strong>${order.customerName}</strong><br>
+                            <small>${order.address}</small>
+                        </div>
+                    </div>
+                    <button class="btn-google-maps" onclick="openGoogleMaps(${order.lat}, ${order.lng})">
+                        <i class="fas fa-directions"></i> Google Maps
+                    </button>
+                </div>
+            `;
+        }).join('')}
+    `;
+}
+
+function renderRouteStats(stats) {
+    const container = document.getElementById('routeStats');
+    if (!container) return;
+
+    if (!stats || stats.totalDistance === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-2">Aucune tournée en cours</div>';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="stat-card">
+                <div class="stat-value">${stats.totalDistance} km</div>
+                <div class="stat-label"><i class="fas fa-road"></i> Distance totale</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${stats.totalDuration} min</div>
+                <div class="stat-label"><i class="fas fa-clock"></i> Durée estimée</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${orders.length}</div>
+                <div class="stat-label"><i class="fas fa-map-marker-alt"></i> Arrêts</div>
+            </div>
+        </div>
+    `;
+}
+
+// ============================================
+// FONCTIONS D'ACTIONS
+// ============================================
+
+function addOrderToList(customerName, address, lat, lng, phone, priority) {
+    const newOrder = {
+        id: Date.now().toString(),
+        customerName,
+        address,
+        lat,
+        lng,
+        phone: phone || null,
+        priority,
+        status: 'pending'
+    };
+    
+    orders.push(newOrder);
+    saveOrders(orders);
+    renderOrders();
+    updateMap();
+    renderRouteSteps();
+}
+
+function updateOrderStatus(orderId, newStatus) {
+    orders = orders.map(order =>
+        order.id === orderId ? { ...order, status: newStatus } : order
+    );
+    saveOrders(orders);
+    renderOrders();
+    updateMap();
+}
+
+function confirmDeleteOrder(orderId, customerName) {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer la commande de ${customerName} ?`)) {
+        orders = deleteOrder(orderId);
+        renderOrders();
+        updateMap();
+        renderRouteSteps();
+    }
+}
+
+// ============================================
+// FONCTIONS DE NAVIGATION
+// ============================================
+
+async function openGoogleMaps(lat, lng) {
+    try {
+        // Copier les coordonnées dans le presse-papiers
+        const coordsText = `${lat}, ${lng}`;
+        await navigator.clipboard.writeText(coordsText);
+        
+        // Ouvrir Google Maps avec les coordonnées
+        window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+        
+        // Afficher une confirmation
+        showError(`Coordonnées copiées: ${coordsText}. Google Maps s'ouvre avec ces coordonnées.`);
+    } catch (err) {
+        console.error('Impossible de copier dans le presse-papiers:', err);
+        // Ouvrir Google Maps quand même
+        window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+        showError('Google Maps ouvert. Copiez manuellement les coordonnées si nécessaire.');
+    }
+}
+
+// ============================================
+// FONCTIONS D'OPTIMISATION
+// ============================================
+
+async function optimizeRoute() {
+    if (orders.length === 0) {
+        showError("Aucune commande à optimiser.");
+        return;
+    }
+
+    // Afficher un message de chargement
+    showError("Optimisation de la tournée en cours... Veuillez patienter.");
+
+    try {
+        // Utiliser l'optimisation avec les routes réelles
+        const optimizedRoute = await optimizeRouteWithRealRoutes(PHARMACY, orders);
+        
+        if (optimizedRoute.length > 0) {
+            orders = optimizedRoute;
+            saveOrders(orders);
+            renderOrders();
+            updateMap();
+            renderRouteSteps();
+            
+            // Calculer et afficher les statistiques de la tournée
+            const stats = await calculateRouteStats(PHARMACY, orders);
+            renderRouteStats(stats);
+            
+            // Afficher une notification
+            setTimeout(() => {
+                showError(`Tournée optimisée ! Distance: ${stats.totalDistance} km, Durée: ${stats.totalDuration} min`);
+            }, 500);
+        }
+    } catch (error) {
+        console.error("Erreur lors de l'optimisation:", error);
+        showError("Erreur lors de l'optimisation de la tournée. Utilisation de l'ancienne méthode.");
+        
+        // Revenir à l'ancienne méthode en cas d'erreur
+        const route = [];
+        let currentLat = PHARMACY.lat;
+        let currentLng = PHARMACY.lng;
+        const remaining = [...orders];
+
+        while (remaining.length > 0) {
+            let nearestIndex = 0;
+            let minDistance = Infinity;
+
+            remaining.forEach((order, index) => {
+                const distance = Math.sqrt(
+                    Math.pow(order.lat - currentLat, 2) +
+                    Math.pow(order.lng - currentLng, 2)
+                );
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestIndex = index;
+                }
+            });
+
+            if (nearestIndex !== -1) {
+                route.push(remaining[nearestIndex]);
+                currentLat = remaining[nearestIndex].lat;
+                currentLng = remaining[nearestIndex].lng;
+                remaining.splice(nearestIndex, 1);
+            } else {
+                route.push(remaining[0]);
+                remaining.shift();
+            }
+        }
+
+        orders = route;
+        saveOrders(orders);
+        renderOrders();
+        updateMap();
+        renderRouteSteps();
+    }
+}
+
+// ============================================
+// FONCTIONS D'AUTOCOMPLÉTION
+// ============================================
+
+function showCustomerSuggestions(suggestions) {
+    const container = document.getElementById('customerSuggestions');
+    if (!container) return;
+
+    if (suggestions.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.innerHTML = suggestions.map(customer => {
+        const escapedName = customer.name.replace(/'/g, "\\'");
+        const escapedAddress = customer.address.replace(/'/g, "\\'");
+        return `
+            <div class="list-group-item" onclick="selectCustomer('${escapedName}', '${escapedAddress}', ${customer.lat}, ${customer.lng}, '${customer.phone || ''}')">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${customer.name}</strong>
+                        <div class="small text-muted">${customer.address}</div>
+                    </div>
+                    <i class="fas fa-user-check text-primary"></i>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.style.display = 'block';
+}
+
+function selectCustomer(name, address, lat, lng, phone) {
+    document.getElementById('customerName').value = name;
+    document.getElementById('address').value = address;
+    document.getElementById('phone').value = phone || '';
+    document.getElementById('customerSuggestions').style.display = 'none';
+    document.getElementById('addressSuggestions').style.display = 'none';
+}
+
+function showAddressSuggestions(suggestions) {
+    const container = document.getElementById('addressSuggestions');
+    if (!container) return;
+
+    if (suggestions.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.innerHTML = suggestions.map(s => {
+        const escapedAddress = s.address.replace(/'/g, "\\'");
+        return `
+            <div class="list-group-item" onclick="selectAddress('${escapedAddress}', ${s.lat}, ${s.lng})">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>${s.address}</span>
+                    <small class="text-muted">
+                        <i class="fas fa-map-marker-alt"></i> ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}
+                    </small>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.style.display = 'block';
+}
+
+function selectAddress(address, lat, lng) {
+    document.getElementById('address').value = address;
+    document.getElementById('addressSuggestions').style.display = 'none';
+}
+
+// ============================================
+// FONCTIONS DE SAISIE MANUELLE GPS
+// ============================================
+
+function showManualGPSModal() {
+    // Stocker les données du formulaire en attente
+    const customerName = document.getElementById('customerName').value.trim();
+    const address = document.getElementById('address').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const priority = document.getElementById('priority').checked ? 1 : 0;
+
+    if (!customerName) {
+        showError("Veuillez indiquer un nom de client.");
+        return;
+    }
+
+    // Stocker les données en attente
+    pendingGPSOrder = {
+        customerName: customerName,
+        address: address,
+        phone: phone,
+        priority: priority
+    };
+
+    // Vider le champ de coordonnées
+    document.getElementById('gpsCoordinates').value = '';
+
+    // Fermer la modal actuelle
+    const closestModalEl = document.getElementById('closestAddressModal');
+    if (closestModalEl) {
+        const closestModal = bootstrap.Modal.getInstance(closestModalEl);
+        closestModal.hide();
+    }
+
+    // Afficher la modal de saisie manuelle
+    const manualModalEl = document.getElementById('manualGPSModal');
+    if (manualModalEl) {
+        const manualModal = new bootstrap.Modal(manualModalEl);
+        manualModal.show();
+    }
+}
+
+async function pasteFromClipboard() {
+    try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('gpsCoordinates').value = text;
+    } catch (err) {
+        console.error('Impossible de lire le presse-papiers:', err);
+        showError('Impossible de coller depuis le presse-papiers. Veuillez copier manuellement les coordonnées.');
+    }
+}
+
+function confirmManualGPS() {
+    const coordinatesInput = document.getElementById('gpsCoordinates').value.trim();
+
+    // Parser les coordonnées (format: lat, lng)
+    const coordsMatch = coordinatesInput.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+    
+    if (!coordsMatch) {
+        showError("Format de coordonnées invalide. Utilisez le format: latitude, longitude (ex: -20.9286, 55.6142)");
+        return;
+    }
+
+    const lat = parseFloat(coordsMatch[1]);
+    const lng = parseFloat(coordsMatch[2]);
+
+    // Vérifier que les coordonnées sont dans les limites de La Réunion
+    if (lat < -21.4 || lat > -20.8 || lng < 55.2 || lng > 55.9) {
+        showError("Les coordonnées ne semblent pas être pour La Réunion. Veuillez vérifier et réessayer.");
+        return;
+    }
+
+    // Si on a des données en attente, créer la commande
+    if (pendingGPSOrder) {
+        addOrderToList(
+            pendingGPSOrder.customerName,
+            pendingGPSOrder.address,
+            lat,
+            lng,
+            pendingGPSOrder.phone,
+            pendingGPSOrder.priority
+        );
+
+        // Réinitialiser
+        pendingGPSOrder = null;
+        document.getElementById('addOrderForm').reset();
+        document.getElementById('gpsCoordinates').value = '';
+
+        // Fermer la modal
+        const modalEl = document.getElementById('manualGPSModal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+        }
+    }
+}
+
+// ============================================
+// FONCTIONS DE MODAL
+// ============================================
+
+function showClosestAddresses(suggestions, originalQuery) {
+    const modalEl = document.getElementById('closestAddressModal');
+    if (!modalEl) return;
+
+    const modal = new bootstrap.Modal(modalEl);
+    const optionsContainer = document.getElementById('closestAddressOptions');
+
+    if (suggestions.length === 0) {
+        optionsContainer.innerHTML = '<div class="alert alert-warning">Aucune adresse proche trouvée à La Réunion.</div>';
+        modal.show();
+        return;
+    }
+
+    // Trier les suggestions par distance (la plus proche en premier)
+    suggestions.sort((a, b) => {
+        const distA = Math.sqrt(
+            Math.pow(a.lat - PHARMACY.lat, 2) +
+            Math.pow(a.lng - PHARMACY.lng, 2)
+        );
+        const distB = Math.sqrt(
+            Math.pow(b.lat - PHARMACY.lat, 2) +
+            Math.pow(b.lng - PHARMACY.lng, 2)
+        );
+        return distA - distB;
+    });
+
+    optionsContainer.innerHTML = suggestions.map((suggestion, index) => {
+        const escapedAddress = suggestion.address.replace(/'/g, "\\'");
+        return `
+            <div class="list-group-item" onclick="selectClosestAddress(${index})">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${suggestion.address}</strong>
+                    </div>
+                    <i class="fas fa-map-marker-alt text-primary"></i>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Stocker les suggestions et la requête originale
+    pendingClosestAddress = {
+        suggestions: suggestions,
+        originalQuery: originalQuery
+    };
+
+    modal.show();
+}
+
+function selectClosestAddress(index) {
+    if (!pendingClosestAddress || !pendingClosestAddress.suggestions[index]) {
+        return;
+    }
+
+    const selected = pendingClosestAddress.suggestions[index];
+    document.getElementById('address').value = selected.address;
+    document.getElementById('addressSuggestions').style.display = 'none';
+
+    // Ajouter la commande avec les coordonnées de l'adresse sélectionnée
+    const customerName = document.getElementById('customerName').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const priority = document.getElementById('priority').checked ? 1 : 0;
+
+    if (!customerName) {
+        showError("Veuillez indiquer un nom de client.");
+        return;
+    }
+
+    addOrderToList(
+        customerName,
+        selected.address,
+        selected.lat,
+        selected.lng,
+        phone,
+        priority
+    );
+
+    document.getElementById('addOrderForm').reset();
+
+    // Fermer la modal
+    const modalEl = document.getElementById('closestAddressModal');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+    }
+}
+
+// ============================================
+// FONCTIONS UTILITAIRES
+// ============================================
+
+function showError(message) {
+    const modalEl = document.getElementById('errorModal');
+    if (!modalEl) return;
+    const modal = new bootstrap.Modal(modalEl);
+    document.getElementById('errorMessage').textContent = message;
+    modal.show();
+}
+
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function setupMobileOptimizations() {
+    // Masquer le clavier quand on clique en dehors des champs
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('input') && !e.target.closest('textarea')) {
+            if (isMobileDevice()) {
+                document.activeElement.blur();
+            }
+        }
+    });
+
+    // Feedback visuel sur les boutons
+    const buttons = document.querySelectorAll('.btn, .list-group-item, .order-card, .step-item');
+    buttons.forEach(btn => {
+        btn.addEventListener('touchstart', function() {
+            this.style.transform = 'scale(0.98)';
+            this.style.transition = 'transform 0.1s ease';
+        });
+        
+        btn.addEventListener('touchend', function() {
+            this.style.transform = '';
+        });
+        
+        btn.addEventListener('touchcancel', function() {
+            this.style.transform = '';
+        });
+    });
+}
+
+// ============================================
+// CONFIGURATION DES ÉCOUTEURS
+// ============================================
+
+function setupEventListeners() {
+    // Formulaire d'ajout de commande
+    const addOrderForm = document.getElementById('addOrderForm');
+    if (!addOrderForm) return;
+
+    addOrderForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const customerName = document.getElementById('customerName').value.trim();
+        const address = document.getElementById('address').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        const priority = document.getElementById('priority').checked ? 1 : 0;
+
+        if (!customerName || !address) {
+            showError("Veuillez remplir tous les champs obligatoires.");
+            return;
+        }
+
+        // Rechercher l'adresse (utilise Google Maps en priorité)
+        const suggestions = await searchAddress(address, GOOGLE_MAPS_API_KEY);
+
+        if (suggestions.length > 0) {
+            // Si on a des suggestions, utiliser la première
+            addOrderToList(customerName, suggestions[0].address, suggestions[0].lat, suggestions[0].lng, phone, priority);
+        } else {
+            // Essayer une recherche plus large avec Google Maps
+            const googleResult = await searchAddressWithGoogle(address + ', La Réunion', GOOGLE_MAPS_API_KEY);
+            if (googleResult.length > 0) {
+                addOrderToList(customerName, googleResult[0].address, googleResult[0].lat, googleResult[0].lng, phone, priority);
+            } else {
+                // Sinon, proposer les adresses proches des commandes existantes
+                const closestFromOrders = findClosestOrder(PHARMACY.lat, PHARMACY.lng, orders);
+
+                if (closestFromOrders) {
+                    showClosestAddresses([closestFromOrders], address);
+                    return;
+                } else {
+                    // Ouvrir automatiquement la modal pour entrer manuellement
+                    showManualGPSModal();
+                    return;
+                }
+            }
+        }
+
+        addOrderForm.reset();
+        document.getElementById('addressSuggestions').style.display = 'none';
+    });
+
+    // Autocomplétion des clients
+    const customerInput = document.getElementById('customerName');
+    if (customerInput) {
+        let customerSearchTimeout;
+        customerInput.addEventListener('input', (e) => {
+            clearTimeout(customerSearchTimeout);
+            const query = e.target.value.trim();
+            customerSearchTimeout = setTimeout(() => {
+                const suggestions = searchCustomers(orders, query);
+                showCustomerSuggestions(suggestions);
+            }, 300);
+        });
+    }
+
+    // Autocomplétion des adresses
+    const addressInput = document.getElementById('address');
+    if (!addressInput) return;
+
+    let addressSearchTimeout;
+    addressInput.addEventListener('input', async (e) => {
+        clearTimeout(addressSearchTimeout);
+        const query = e.target.value.trim();
+        
+        if (query.length < 3) {
+            document.getElementById('addressSuggestions').style.display = 'none';
+            return;
+        }
+
+        addressSearchTimeout = setTimeout(async () => {
+            const suggestions = await searchAddress(query, GOOGLE_MAPS_API_KEY);
+            showAddressSuggestions(suggestions);
+        }, 500);
+    });
+
+    // Optimiser la tournée
+    const optimizeBtn = document.getElementById('optimizeRouteBtn');
+    if (optimizeBtn) {
+        optimizeBtn.addEventListener('click', optimizeRoute);
+    }
+
+    // Bouton flottant pour optimiser (mobile)
+    const optimizeFloatingBtn = document.getElementById('optimizeFloatingBtn');
+    if (optimizeFloatingBtn) {
+        optimizeFloatingBtn.addEventListener('click', optimizeRoute);
+    }
+
+    // Masquer les suggestions en cliquant ailleurs
+    document.addEventListener('click', (e) => {
+        const addressSuggestions = document.getElementById('addressSuggestions');
+        const customerSuggestions = document.getElementById('customerSuggestions');
+        
+        if (addressSuggestions && !e.target.closest('#address') && !e.target.closest('#addressSuggestions')) {
+            addressSuggestions.style.display = 'none';
+        }
+        
+        if (customerSuggestions && !e.target.closest('#customerName') && !e.target.closest('#customerSuggestions')) {
+            customerSuggestions.style.display = 'none';
+        }
+    });
+
+    // Menu mobile
+    const menuToggle = document.getElementById('menuToggle');
+    if (menuToggle) {
+        menuToggle.addEventListener('click', toggleMobileMenu);
+    }
+
+    // Fermer le menu quand on clique sur l'overlay
+    const menuOverlay = document.getElementById('menuOverlay');
+    if (menuOverlay) {
+        menuOverlay.addEventListener('click', () => {
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar) sidebar.classList.remove('open');
+            if (menuOverlay) menuOverlay.classList.remove('active');
+            if (menuToggle) menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+        });
+    }
+}
+
+// ============================================
+// FONCTIONS MOBILE
+// ============================================
+
+function toggleMobileMenu() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('menuOverlay');
+    const toggleBtn = document.getElementById('menuToggle');
+    
+    if (sidebar && overlay) {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+        
+        // Changer l'icône du bouton
+        if (sidebar.classList.contains('open')) {
+            toggleBtn.innerHTML = '<i class="fas fa-times"></i>';
+        } else {
+            toggleBtn.innerHTML = '<i class="fas fa-bars"></i>';
+        }
+    }
+}

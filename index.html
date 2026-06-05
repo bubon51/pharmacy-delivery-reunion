@@ -1,43 +1,54 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#17a2b8">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Pharmacy Delivery Réunion</title>
+    
+    <!-- Manifest PWA -->
+    <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512x512.png">
-
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pharmacy Delivery Réunion - OpenStreetMap</title>
+    
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
+        /* ============================================
+           STYLES DE BASE
+           ============================================ */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
             background-color: #f8f9fa;
         }
+        
         .sidebar {
             background-color: #f0f2f5;
             height: 100vh;
             overflow-y: auto;
             border-right: 1px solid #dee2e6;
         }
+        
         .map-container {
             padding: 0;
             position: relative;
         }
+        
         #map {
             height: calc(100vh - 60px);
             width: 100%;
         }
+        
         .route-steps {
             position: absolute;
             bottom: 20px;
@@ -50,27 +61,35 @@
             max-height: 300px;
             overflow-y: auto;
         }
+        
         .order-card {
             margin-bottom: 10px;
             border-left: 4px solid #0d6efd;
             cursor: pointer;
         }
+        
         .order-card.urgent {
             border-left-color: #dc3545;
         }
+        
         .order-card .card-body {
             padding: 10px;
         }
-        #addressSuggestions .list-group-item {
+        
+        #addressSuggestions .list-group-item,
+        #customerSuggestions .list-group-item {
             cursor: pointer;
             padding: 8px 15px;
             font-size: 0.9rem;
         }
-        #addressSuggestions .list-group-item:hover {
+        
+        #addressSuggestions .list-group-item:hover,
+        #customerSuggestions .list-group-item:hover {
             background-color: #f8f9fa;
         }
+        
         .btn-google-maps {
-            background-color: #0073ff;
+            background-color: #4285F4;
             color: white;
             border: none;
             padding: 5px 10px;
@@ -78,9 +97,11 @@
             cursor: pointer;
             font-size: 0.8rem;
         }
+        
         .btn-google-maps:hover {
-            background-color: #0056d3;
+            background-color: #3367D6;
         }
+        
         .step-item {
             padding: 8px;
             border-bottom: 1px solid #eee;
@@ -88,6 +109,7 @@
             justify-content: space-between;
             align-items: center;
         }
+        
         .step-number {
             background-color: #0d6efd;
             color: white;
@@ -100,36 +122,14 @@
             font-size: 0.8rem;
             margin-right: 10px;
         }
+        
         .last-updated {
             font-size: 0.8rem;
             color: #6c757d;
             text-align: right;
             margin-top: 5px;
         }
-        @media (max-width: 768px) {
-            .sidebar { height: auto; }
-            #map { height: 400px; }
-            .route-steps { position: relative; margin-top: 20px; }
-        }
-    
-        /* Style pour la modal GPS */
-        #manualGPSModal .modal-header {
-            background-color: #17a2b8;
-        }
-        #manualGPSModal .btn-close {
-            filter: brightness(0) invert(1);
-        }
-        #gpsCoordinates {
-            font-family: monospace;
-        }
-        .btn-google-maps-search {
-            background-color: #0073ff;
-            color: white;
-        }
-        .btn-google-maps-search:hover {
-            background-color: #0056d3;
-        }
-
+        
         /* Style pour les cartes de statistiques */
         .stat-card {
             background: white;
@@ -150,76 +150,82 @@
             color: #6c757d;
             margin-top: 5px;
         }
-        /* Style pour l'autocomplétion des clients */
-        #customerSuggestions {
-            position: absolute;
-            z-index: 1000;
-            width: calc(100% - 30px);
-            max-height: 200px;
-            overflow-y: auto;
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            display: none;
-        }
-        #customerSuggestions .list-group-item {
-            cursor: pointer;
-            padding: 8px 15px;
-            font-size: 0.9rem;
-            border-bottom: 1px solid #f1f3f5;
-        }
-        #customerSuggestions .list-group-item:hover {
-            background-color: #f8f9fa;
-        }
-        #customerSuggestions .list-group-item:last-child {
-            border-bottom: none;
-        }
-
-        /* Style pour les boutons Google Maps */
-        .btn-google-maps {
-            background-color: #4285F4;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
-        }
-        .btn-google-maps:hover {
-            background-color: #3367D6;
-        }
-        .btn-google-maps-search {
-            background-color: #4285F4;
-            color: white;
-        }
-        .btn-google-maps-search:hover {
-            background-color: #3367D6;
-        }
-
+        
         /* ============================================
            OPTIMISATION MOBILE (Mobile-First)
            ============================================ */
         
-        /* Reset et base mobile */
         * {
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
-            -webkit-user-select: none;
         }
         
-        body {
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+        /* Bouton menu hamburger */
+        .menu-toggle {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1051;
+            background: #17a2b8;
+            color: white;
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 5px;
+            font-size: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            display: none;
         }
         
-        /* Layout mobile */
-        .container-fluid {
-            padding: 0;
-            overflow-x: hidden;
+        .menu-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1049;
         }
         
-        /* Barre latérale - devient un menu déroulant sur mobile */
+        .menu-overlay.active {
+            display: block;
+        }
+        
+        /* Boutons flottants pour mobile */
+        .floating-action-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #17a2b8;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            font-size: 1.5rem;
+        }
+        
+        .floating-action-button:active {
+            background: #138496;
+            transform: scale(0.95);
+        }
+        
+        /* Modal mobile */
+        .modal-dialog {
+            margin: 10px;
+        }
+        
+        /* Champ GPS mobile */
+        #gpsCoordinates {
+            font-family: monospace;
+            font-size: 1rem;
+            padding: 12px;
+        }
+        
+        /* Mobile */
         @media (max-width: 768px) {
             .sidebar {
                 position: fixed;
@@ -255,43 +261,10 @@
                 right: auto;
             }
             
-            /* Bouton menu hamburger */
             .menu-toggle {
-                position: fixed;
-                top: 10px;
-                left: 10px;
-                z-index: 1051;
-                background: #17a2b8;
-                color: white;
-                border: none;
-                width: 45px;
-                height: 45px;
-                border-radius: 5px;
-                font-size: 1.5rem;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            }
-            
-            .menu-toggle:active {
-                background: #138496;
-            }
-            
-            /* Overlay pour fermer le menu */
-            .menu-overlay {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0,0,0,0.5);
-                z-index: 1049;
-            }
-            
-            .menu-overlay.active {
                 display: block;
             }
             
-            /* Formulaire mobile */
             .card-body {
                 padding: 15px;
             }
@@ -307,7 +280,6 @@
                 min-height: 45px;
             }
             
-            /* Suggestions mobiles */
             #addressSuggestions,
             #customerSuggestions {
                 position: fixed;
@@ -318,28 +290,6 @@
                 z-index: 1050;
             }
             
-            /* Boutons flottants pour mobile */
-            .floating-action-button {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                z-index: 1000;
-                width: 56px;
-                height: 56px;
-                border-radius: 50%;
-                background: #17a2b8;
-                color: white;
-                border: none;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-                font-size: 1.5rem;
-            }
-            
-            .floating-action-button:active {
-                background: #138496;
-                transform: scale(0.95);
-            }
-            
-            /* Cartes de statistiques mobiles */
             .stat-card {
                 min-width: 80px;
                 padding: 8px 12px;
@@ -350,34 +300,12 @@
                 font-size: 1.2rem;
             }
             
-            /* Modal mobile */
-            .modal-dialog {
-                margin: 10px;
-                max-width: calc(100% - 20px);
-            }
-            
-            .modal-content {
-                border-radius: 10px;
-            }
-            
-            /* Optimisation des listes */
-            .order-card {
-                margin-bottom: 10px;
-                border-radius: 8px;
-            }
-            
-            .order-card .card-body {
-                padding: 10px;
-            }
-            
-            /* Boutons dans les cartes */
             .order-card .btn {
                 padding: 6px 12px;
                 font-size: 0.85rem;
                 margin: 0 3px;
             }
             
-            /* Itinéraire mobile */
             .step-item {
                 padding: 10px;
                 font-size: 0.9rem;
@@ -389,13 +317,6 @@
                 font-size: 0.75rem;
             }
             
-            /* Champ GPS mobile */
-            #gpsCoordinates {
-                font-size: 1rem;
-                padding: 12px;
-            }
-            
-            /* Boutons Waze/Google Maps mobiles */
             .btn-google-maps {
                 padding: 8px 12px;
                 font-size: 0.85rem;
@@ -440,33 +361,6 @@
                 left: 20px;
                 right: 20px;
             }
-            
-            /* Cacher le bouton menu sur desktop */
-            .menu-toggle {
-                display: none;
-            }
-        }
-        
-        /* Optimisation pour iOS */
-        @supports (-webkit-touch-callout: none) {
-            .form-control:focus,
-            .btn:focus {
-                outline: none;
-            }
-            
-            /* Éviter le zoom sur les champs input */
-            input[type="text"],
-            input[type="tel"],
-            input[type="email"],
-            input[type="number"],
-            input[type="password"] {
-                font-size: 16px !important;
-            }
-        }
-        
-        /* Scroll fluide */
-        html {
-            scroll-behavior: smooth;
         }
         
         /* Prévention du double-tap zoom */
@@ -477,52 +371,27 @@
             max-width: 100%;
             height: auto;
         }
-        
-        /* Boutons avec icônes pour mobile */
-        .btn-with-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        
-        .btn-with-icon i {
-            font-size: 1.1em;
-        }
-        
-        /* Badge pour notifications */
-        .notification-badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: #dc3545;
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 0.7rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-</style>
+    </style>
 </head>
-<body>    <!-- Bouton menu hamburger pour mobile -->
+<body>
+    <!-- Bouton menu hamburger pour mobile -->
     <button class="menu-toggle" id="menuToggle">
         <i class="fas fa-bars"></i>
     </button>
     <div class="menu-overlay" id="menuOverlay"></div>
-
+    
     <div class="container-fluid">
         <div class="row">
             <!-- Barre latérale -->
             <div class="col-md-4 sidebar">
                 <h1 class="text-center my-4">
                     <i class="fas fa-truck-medical"></i> Pharmacy Delivery Réunion
-                                <button id="installAppBtn" class="btn btn-info mt-2" 
-                        style="display: none;" onclick="showInstallPrompt()">
+                </h1>
+                
+                <button id="installAppBtn" class="btn btn-info mt-2 w-100" style="display: none;" onclick="showInstallPrompt()">
                     <i class="fas fa-download"></i> Installer l'application
-                </button></h1>
+                </button>
+                
                 <div class="card mb-4">
                     <div class="card-header bg-primary text-white">
                         <h5><i class="fas fa-plus"></i> Ajouter une commande</h5>
@@ -535,10 +404,10 @@
                                        placeholder="Commencez à taper pour voir les clients existants...">
                                 <div id="customerSuggestions" class="list-group"></div>
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-3 position-relative">
                                 <label for="address" class="form-label">Adresse (La Réunion uniquement)</label>
                                 <input type="text" class="form-control" id="address" required placeholder="Ex: 12 Rue de Paris, Saint-Denis">
-                                <div id="addressSuggestions" class="list-group mt-2" style="display: none;"></div>
+                                <div id="addressSuggestions" class="list-group"></div>
                             </div>
                             <div class="mb-3">
                                 <label for="phone" class="form-label">Téléphone (optionnel)</label>
@@ -582,6 +451,11 @@
             </div>
         </div>
     </div>
+    
+    <!-- Bouton flottant pour optimiser la tournée (mobile) -->
+    <button class="floating-action-button" id="optimizeFloatingBtn" title="Optimiser la tournée">
+        <i class="fas fa-route"></i>
+    </button>
 
     <!-- Modal pour les erreurs -->
     <div class="modal fade" id="errorModal" tabindex="-1">
@@ -612,14 +486,9 @@
                     <div id="closestAddressOptions" class="list-group"></div>
                     <div class="mt-3 text-center">
                         <p class="mb-2">Ou</p>
-                        <button type="button" class="btn btn-primary btn-lg" onclick="openGoogleMapsForSearch()">
-                            <i class="fas fa-search"></i> Chercher sur Google Maps
+                        <button type="button" class="btn btn-primary btn-lg" onclick="showManualGPSModal()">
+                            <i class="fas fa-map-marker-alt"></i> Entrer les coordonnées GPS manuellement
                         </button>
-                        <div class="mt-2">
-                            <button type="button" class="btn btn-info" onclick="showManualGPSModal()">
-                                <i class="fas fa-map-marker-alt"></i> Entrer les coordonnées GPS manuellement
-                            </button>
-                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -675,23 +544,6 @@
                         <i class="fas fa-exclamation-triangle"></i> 
                         Vérifiez que les coordonnées correspondent bien à une adresse à <strong>La Réunion</strong>
                     </div>
-                    <div id="gpsPreview" class="mt-3 p-3 bg-light rounded d-none">
-                        <h6 class="mb-2"><i class="fas fa-eye"></i> Aperçu des coordonnées :</h6>
-                        <div class="row">
-                            <div class="col-6">
-                                <strong>Latitude :</strong> <span id="previewLat" class="text-primary"></span>
-                            </div>
-                            <div class="col-6">
-                                <strong>Longitude :</strong> <span id="previewLng" class="text-primary"></span>
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="fas fa-check-circle text-success"></i> 
-                                Coordonnées valides pour La Réunion
-                            </small>
-                        </div>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -708,1213 +560,15 @@
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // ======================
-        // CONFIGURATION
-        // ======================
-        const pharmacy = {
-            name: "Pharmacie de l'Océan Indien",
-            address: "133 avenue du Mahatma Gandhi, 97441 Saint-Suzanne",
-            lat: -20.932179057032947,
-            lng: 55.64139511027464
-        };
-
-            // Clé API Google Maps (pour le géocodage)
-    const GOOGLE_MAPS_API_KEY = 'AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc';
-
-// Limites géographiques de La Réunion (pour restreindre les recherches)
-        const reunionBounds = [
-            [-21.4, 55.2],  // Sud-Ouest
-            [-20.8, 55.9]   // Nord-Est
-        ];
-
-        // Variables globales
-        let map;
-        let markers = [];
-        let polyline;
-        let orders = JSON.parse(localStorage.getItem('orders')) || [];
-        let pendingClosestAddress = null;
-        let lastMapUpdate = localStorage.getItem('lastMapUpdate') || null;
-
-        // ======================
-        // FONCTIONS DE CARTE
-        // ======================
-        function initMap() {
-            if (map) return;
-
-            // Initialiser la carte centrée sur La Réunion
-            map = L.map('map', {
-                maxBounds: reunionBounds,  // Restreindre la vue à La Réunion
-                maxBoundsViscosity: 1.0,    // Empêcher de sortir des limites
-                gestureHandling: true,      // Activer les gestes tactiles
-                tap: true,                  // Activer le tap
-                touchZoom: true,           // Zoom tactile
-                scrollWheelZoom: !isMobileDevice()  // Désactiver le scroll wheel sur mobile
-            }).setView([-20.8785, 55.4484], 10);  // Vue initiale centrée sur La Réunion
-
-            // Ajouter les tuiles OpenStreetMap
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 18
-            }).addTo(map);
-
-            // Correction pour les icônes Leaflet
-            delete L.Icon.Default.prototype._getIconUrl;
-            L.Icon.Default.mergeOptions({
-                iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-                iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png'
-            });
-
-            // Icône personnalisée pour la pharmacie
-            const pharmacyIcon = L.icon({
-                iconUrl: 'https://cdn-icons-png.flaticon.com/512/1087/1087915.png',
-                iconSize: [32, 32],
-                iconAnchor: [16, 32],
-                popupAnchor: [0, -32]
-            });
-
-            // Ajouter le marqueur de la pharmacie
-            L.marker([pharmacy.lat, pharmacy.lng], { icon: pharmacyIcon })
-                .addTo(map)
-                .bindPopup(`<b>${pharmacy.name}</b><br>${pharmacy.address}`);
-
-            markers.push(L.marker([pharmacy.lat, pharmacy.lng], { icon: pharmacyIcon }));
-
-            // Mettre à jour la date de dernière mise à jour
-            updateLastUpdatedDate();
-            
-            // Optimisation pour mobile : recentrer la carte après l'ouverture du menu
-            if (isMobileDevice()) {
-                // Écouter les changements de taille de fenêtre
-                window.addEventListener('resize', () => {
-                    if (map) {
-                        setTimeout(() => {
-                            map.invalidateSize();
-                        }, 100);
-                    }
-                });
-            }
-        }
-
-        // Mettre à jour la date de dernière mise à jour de la carte
-        function updateLastUpdatedDate() {
-            const now = new Date();
-            lastMapUpdate = now.toISOString();
-            localStorage.setItem('lastMapUpdate', lastMapUpdate);
-
-            const lastUpdatedEl = document.getElementById('lastUpdatedDate');
-            if (lastUpdatedEl) {
-                lastUpdatedEl.textContent = now.toLocaleDateString('fr-FR', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            }
-        }
-
-        // Vérifier si la carte a besoin d'être mise à jour (1 fois par semaine)
-        function checkMapUpdate() {
-            if (!lastMapUpdate) {
-                updateLastUpdatedDate();
-                return;
-            }
-
-            const lastUpdate = new Date(lastMapUpdate);
-            const now = new Date();
-            const oneWeekInMs = 7 * 24 * 60 * 60 * 1000; // 1 semaine en millisecondes
-
-            if (now - lastUpdate > oneWeekInMs) {
-                updateLastUpdatedDate();
-                showError("La carte a été mise à jour automatiquement (1 fois par semaine).");
-            }
-        }
-
-        function updateMap() {
-            if (!map) {
-                console.error("La carte n'est pas initialisée.");
-                return;
-            }
-
-            // Effacer tous les marqueurs sauf la pharmacie
-            markers.slice(1).forEach(marker => {
-                if (map.hasLayer(marker)) map.removeLayer(marker);
-            });
-            markers = markers.slice(0, 1);
-
-            // Ajouter les marqueurs des commandes
-            orders.forEach((order, index) => {
-                const marker = L.marker([order.lat, order.lng])
-                    .addTo(map)
-                    .bindPopup(`
-                        <b>${index+1}. ${order.customerName}</b><br>
-                        ${order.address}<br>
-                        <button onclick="openGoogleMaps(${order.lat}, ${order.lng})" class="btn-google-maps mt-2">
-                            <i class="fas fa-directions"></i> Naviguer avec Google Maps
-                        </button>
-                    `);
-                markers.push(marker);
-            });
-
-            // Dessiner l'itinéraire
-            if (orders.length > 0) {
-                if (polyline && map.hasLayer(polyline)) map.removeLayer(polyline);
-
-                const routePoints = [
-                    [pharmacy.lat, pharmacy.lng],
-                    ...orders.map(o => [o.lat, o.lng])
-                ];
-
-                polyline = L.polyline(routePoints, {
-                    color: 'blue',
-                    weight: 5,
-                    opacity: 0.7
-                }).addTo(map);
-
-                map.fitBounds(routePoints);
-            } else {
-                map.setView([pharmacy.lat, pharmacy.lng], 15);
-            }
-        }
-
-        // ======================
-        // FONCTIONS DE RECHERCHE D'ADRESSES (RESTREINTES À LA RÉUNION)
-        // ======================
-        async function searchAddress(query) {
-            if (!query || query.length < 3) return [];
-
-            try {
-                // Utiliser Nominatim avec des paramètres pour restreindre à La Réunion
-                const response = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&bounded=1&viewbox=-21.4,-55.9,-20.8,-55.2&limit=5`
-                );
-
-                if (!response.ok) throw new Error(`Erreur HTTP : ${response.status}`);
-
-                const data = await response.json();
-
-                // Filtrer les résultats pour ne garder que ceux à La Réunion
-                return data
-                    .filter(item => {
-                        // Vérifier que les coordonnées sont dans les limites de La Réunion
-                        const lat = parseFloat(item.lat);
-                        const lng = parseFloat(item.lon);
-                        return lat >= -21.4 && lat <= -20.8 && lng >= 55.2 && lng <= 55.9;
-                    })
-                    .map(item => ({
-                        address: item.display_name,
-                        lat: parseFloat(item.lat),
-                        lng: parseFloat(item.lon)
-                    }));
-            } catch (error) {
-                console.error("Erreur lors de la recherche d'adresses :", error);
-                return [];
-            }
-        }
-
-        // Trouver l'adresse la plus proche parmi les commandes existantes
-        function findClosestFromOrders(targetLat, targetLng) {
-            if (orders.length === 0) return null;
-
-            let closest = null;
-            let minDistance = Infinity;
-
-            orders.forEach(order => {
-                const distance = Math.sqrt(
-                    Math.pow(order.lat - targetLat, 2) +
-                    Math.pow(order.lng - targetLng, 2)
-                );
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closest = order;
-                }
-            });
-
-            return closest;
-        }
-
-        // ======================
-        // FONCTIONS D'INTERFACE
-        // ======================
-        function renderOrders() {
-            const container = document.getElementById('ordersList');
-            if (!container) return;
-
-            container.innerHTML = orders.length === 0
-                ? '<div class="text-center text-muted py-3">Aucune commande en attente</div>'
-                : orders.map((order, index) => {
-                    const escapedName = order.customerName.replace(/'/g, "\\'");
-                    return `
-                        <div class="card order-card ${order.priority ? 'urgent' : ''} mb-2">
-                            <div class="card-body">
-                                <h5 class="card-title">${order.customerName}</h5>
-                                <p class="card-text">${order.address}</p>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <small class="text-muted">
-                                        ${order.status === 'pending' ? 'En attente' :
-                                          order.status === 'in_progress' ? 'En cours' : 'Livrée'}
-                                    </small>
-                                    <div>
-                                        ${order.status === 'pending' ?
-                                            `<button class="btn btn-sm btn-outline-primary me-2" onclick="updateStatus('${order.id}', 'in_progress')">
-                                                <i class="fas fa-play"></i> Démarrer
-                                            </button>` : ''}
-                                        ${order.status === 'in_progress' ?
-                                            `<button class="btn btn-sm btn-outline-success me-2" onclick="updateStatus('${order.id}', 'delivered')">
-                                                <i class="fas fa-check"></i> Livrée
-                                            </button>` : ''}
-                                        <button class="btn btn-sm btn-danger" onclick="confirmDelete('${order.id}', '${escapedName}')">
-                                            <i class="fas fa-trash"></i> Supprimer
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-        }
-
-        // Afficher les statistiques de la tournée
-        function renderRouteStats(stats) {
-            const container = document.getElementById('routeStats');
-            if (!container) return;
-
-            if (!stats || stats.totalDistance === 0) {
-                container.innerHTML = '<div class="text-center text-muted py-2">Aucune tournée en cours</div>';
-                return;
-            }
-
-            container.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="stat-card">
-                        <div class="stat-value">${stats.totalDistance} km</div>
-                        <div class="stat-label"><i class="fas fa-road"></i> Distance totale</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${stats.totalDuration} min</div>
-                        <div class="stat-label"><i class="fas fa-clock"></i> Durée estimée</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${orders.length}</div>
-                        <div class="stat-label"><i class="fas fa-map-marker-alt"></i> Arrêts</div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderRouteSteps() {
-            const container = document.getElementById('stepsList');
-            if (!container) return;
-
-            container.innerHTML = orders.length === 0
-                ? '<div class="text-center text-muted py-2">Aucune tournée optimisée</div>'
-                : `
-                    <div class="step-item">
-                        <div class="d-flex align-items-center">
-                            <div class="step-number">1</div>
-                            <div>
-                                <strong>${pharmacy.name}</strong><br>
-                                <small>${pharmacy.address}</small>
-                            </div>
-                        </div>
-                        <button class="btn-google-maps" onclick="openGoogleMaps(${pharmacy.lat}, ${pharmacy.lng})">
-                            <i class="fas fa-directions"></i> Google Maps
-                        </button>
-                    </div>
-                    ${orders.map((order, index) => {
-                        const escapedName = order.customerName.replace(/'/g, "\\'");
-                        return `
-                            <div class="step-item">
-                                <div class="d-flex align-items-center">
-                                    <div class="step-number">${index + 2}</div>
-                                    <div>
-                                        <strong>${order.customerName}</strong><br>
-                                        <small>${order.address}</small>
-                                    </div>
-                                </div>
-                                <button class="btn-google-maps" onclick="openGoogleMaps(${order.lat}, ${order.lng})">
-                                    <i class="fas fa-directions"></i> Google Maps
-                                </button>
-                            </div>
-                        `;
-                    }).join('')}
-                `;
-        }
-
-        // ======================
-        // FONCTIONS D'ACTIONS
-        // ======================
-        function addOrder(customerName, address, lat, lng, phone, priority) {
-            const newOrder = {
-                id: Date.now().toString(),
-                customerName,
-                address,
-                lat,
-                lng,
-                phone: phone || null,
-                priority,
-                status: 'pending'
-            };
-            orders.push(newOrder);
-            saveOrders();
-            renderOrders();
-            updateMap();
-        }
-
-        function updateStatus(orderId, newStatus) {
-            orders = orders.map(order =>
-                order.id === orderId ? { ...order, status: newStatus } : order
-            );
-            saveOrders();
-            renderOrders();
-        }
-
-        function confirmDelete(orderId, customerName) {
-            if (confirm(`Êtes-vous sûr de vouloir supprimer la commande de ${customerName} ?`)) {
-                orders = orders.filter(order => order.id !== orderId);
-                saveOrders();
-                renderOrders();
-                updateMap();
-            }
-        }
-
-        // Optimiser la tournée avec les routes réelles
-        async function optimizeRoute() {
-            if (orders.length === 0) {
-                showError("Aucune commande à optimiser.");
-                return;
-            }
-
-            // Afficher un message de chargement
-            showError("Optimisation de la tournée en cours... Veuillez patienter.");
-
-            try {
-                // Utiliser l'optimisation avec les routes réelles
-                const optimizedRoute = await optimizeRouteWithRealRoutes(pharmacy, orders);
-                
-                if (optimizedRoute.length > 0) {
-                    orders = optimizedRoute;
-                    saveOrders();
-                    renderOrders();
-                    updateMap();
-                    renderRouteSteps();
-                    
-                    // Calculer et afficher les statistiques de la tournée
-                    const stats = await calculateRouteStats(pharmacy, orders);
-                    
-                    // Afficher les stats
-                    renderRouteStats(stats);
-                    
-                    // Afficher une notification
-                    setTimeout(() => {
-                        showError(`Tournée optimisée ! Distance: ${stats.totalDistance} km, Durée: ${stats.totalDuration} min`);
-                    }, 500);
-                }
-            } catch (error) {
-                console.error("Erreur lors de l'optimisation:", error);
-                showError("Erreur lors de l'optimisation de la tournée. Utilisation de l'ancienne méthode.");
-                
-                // Revenir à l'ancienne méthode en cas d'erreur
-                const route = [];
-                let currentLat = pharmacy.lat;
-                let currentLng = pharmacy.lng;
-                const remaining = [...orders];
-
-                while (remaining.length > 0) {
-                    let nearestIndex = 0;
-                    let minDistance = Infinity;
-
-                    remaining.forEach((order, index) => {
-                        const distance = Math.sqrt(
-                            Math.pow(order.lat - currentLat, 2) +
-                            Math.pow(order.lng - currentLng, 2)
-                        );
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            nearestIndex = index;
-                        }
-                    });
-
-                    if (nearestIndex !== -1) {
-                        route.push(remaining[nearestIndex]);
-                        currentLat = remaining[nearestIndex].lat;
-                        currentLng = remaining[nearestIndex].lng;
-                        remaining.splice(nearestIndex, 1);
-                    } else {
-                        route.push(remaining[0]);
-                        remaining.shift();
-                    }
-                }
-
-                orders = route;
-                saveOrders();
-                renderOrders();
-                updateMap();
-                renderRouteSteps();
-            }
-        }
-
-        // Ouvrir Google Maps avec les coordonnées et les copier dans le presse-papiers
-        async function openGoogleMaps(lat, lng) {
-            try {
-                // Copier les coordonnées dans le presse-papiers
-                const coordsText = `${lat}, ${lng}`;
-                await navigator.clipboard.writeText(coordsText);
-                
-                // Ouvrir Google Maps avec les coordonnées
-                window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
-                
-                // Afficher une confirmation
-                showError(`Coordonnées copiées: ${coordsText}. Google Maps s'ouvre avec ces coordonnées.`);
-            } catch (err) {
-                console.error('Impossible de copier dans le presse-papiers:', err);
-                // Ouvrir Google Maps quand même
-                window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
-                showError('Google Maps ouvert. Copiez manuellement les coordonnées si nécessaire.');
-            }
-        }
-
-        function saveOrders() {
-            try {
-                localStorage.setItem('orders', JSON.stringify(orders));
-            } catch (e) {
-                console.error("Erreur lors de la sauvegarde des commandes :", e);
-            }
-        }
-
-        function showError(message) {
-            const modalEl = document.getElementById('errorModal');
-            if (!modalEl) return;
-            const modal = new bootstrap.Modal(modalEl);
-            document.getElementById('errorMessage').textContent = message;
-            modal.show();
-        }
-
-        // Afficher les adresses proches dans une modal
-        function showClosestAddresses(suggestions, originalQuery) {
-            const modalEl = document.getElementById('closestAddressModal');
-            if (!modalEl) return;
-
-            const modal = new bootstrap.Modal(modalEl);
-            const optionsContainer = document.getElementById('closestAddressOptions');
-
-            if (suggestions.length === 0) {
-                optionsContainer.innerHTML = '<div class="alert alert-warning">Aucune adresse proche trouvée à La Réunion.</div>';
-                modal.show();
-                return;
-            }
-
-            // Trier les suggestions par distance (la plus proche en premier)
-            suggestions.sort((a, b) => {
-                const distA = Math.sqrt(
-                    Math.pow(a.lat - pharmacy.lat, 2) +
-                    Math.pow(a.lng - pharmacy.lng, 2)
-                );
-                const distB = Math.sqrt(
-                    Math.pow(b.lat - pharmacy.lat, 2) +
-                    Math.pow(b.lng - pharmacy.lng, 2)
-                );
-                return distA - distB;
-            });
-
-            optionsContainer.innerHTML = suggestions.map((suggestion, index) => `
-                <div class="list-group-item" onclick="selectClosestAddress(${index})">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>${suggestion.address}</strong>
-                        </div>
-                        <i class="fas fa-map-marker-alt text-primary"></i>
-                    </div>
-                </div>
-            `).join('');
-
-            // Stocker les suggestions et la requête originale
-            pendingClosestAddress = {
-                suggestions: suggestions,
-                originalQuery: originalQuery
-            };
-
-            modal.show();
-        }
-
-        // Sélectionner une adresse proche
-        function selectClosestAddress(index) {
-            if (!pendingClosestAddress || !pendingClosestAddress.suggestions[index]) {
-                return;
-            }
-
-            const selected = pendingClosestAddress.suggestions[index];
-            document.getElementById('address').value = selected.address;
-            document.getElementById('addressSuggestions').style.display = 'none';
-
-            // Ajouter la commande avec les coordonnées de l'adresse sélectionnée
-            const customerName = document.getElementById('customerName').value.trim();
-            const phone = document.getElementById('phone').value.trim();
-            const priority = document.getElementById('priority').checked ? 1 : 0;
-
-            if (!customerName) {
-                showError("Veuillez indiquer un nom de client.");
-                return;
-            }
-
-            addOrder(
-                customerName,
-                selected.address,
-                selected.lat,
-                selected.lng,
-                phone,
-                priority
-            );
-
-            document.getElementById('addOrderForm').reset();
-
-            // Fermer la modal
-            const modalEl = document.getElementById('closestAddressModal');
-            if (modalEl) {
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
-            }
-        }
-
-        function selectAddress(address, lat, lng) {
-            document.getElementById('address').value = address;
-            document.getElementById('addressSuggestions').style.display = 'none';
-        }
-
-        // ======================
-        // FONCTIONS POUR GOOGLE MAPS ET GPS MANUEL
-        // ======================
-        
-        // Variable pour stocker les données en attente de coordonnées GPS
-        let pendingGPSOrder = null;
-
-        // Ouvrir Google Maps avec l'adresse pré-remplie dans la recherche
-        function openGoogleMapsForSearch() {
-            // Stocker les données du formulaire en attente
-            const customerName = document.getElementById('customerName').value.trim();
-            const address = document.getElementById('address').value.trim();
-            const phone = document.getElementById('phone').value.trim();
-            const priority = document.getElementById('priority').checked ? 1 : 0;
-
-            if (!customerName) {
-                showError("Veuillez indiquer un nom de client.");
-                return;
-            }
-
-            if (!address) {
-                showError("Veuillez indiquer une adresse.");
-                return;
-            }
-
-            // Stocker les données en attente
-            pendingGPSOrder = {
-                customerName: customerName,
-                address: address,
-                phone: phone,
-                priority: priority
-            };
-
-            // Ouvrir Google Maps avec l'adresse pré-remplie dans le champ de recherche
-            // Format: https://www.google.com/maps/search/?api=1&query=<adresse_encodée>
-            const encodedAddress = encodeURIComponent(address + ', La Réunion');
-            window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
-
-            // Fermer la modal actuelle
-            const modalEl = document.getElementById('closestAddressModal');
-            if (modalEl) {
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
-            }
-
-            // Afficher un message pour guider l'utilisateur
-            showError("Google Maps s'ouvre avec votre adresse pré-remplie. Une fois l'adresse trouvée, copiez les coordonnées GPS depuis Google Maps et collez-les dans la fenêtre de saisie manuelle.");
-        }
-
-        // Afficher la modal pour la saisie manuelle des coordonnées GPS
-        function showManualGPSModal() {
-            // Stocker les données du formulaire en attente
-            const customerName = document.getElementById('customerName').value.trim();
-            const address = document.getElementById('address').value.trim();
-            const phone = document.getElementById('phone').value.trim();
-            const priority = document.getElementById('priority').checked ? 1 : 0;
-
-            if (!customerName) {
-                showError("Veuillez indiquer un nom de client.");
-                return;
-            }
-
-            // Stocker les données en attente
-            pendingGPSOrder = {
-                customerName: customerName,
-                address: address,
-                phone: phone,
-                priority: priority
-            };
-
-            // Vider le champ de coordonnées
-            document.getElementById('gpsCoordinates').value = '';
-
-            // Fermer la modal actuelle
-            const closestModalEl = document.getElementById('closestAddressModal');
-            if (closestModalEl) {
-                const closestModal = bootstrap.Modal.getInstance(closestModalEl);
-                closestModal.hide();
-            }
-
-            // Afficher la modal de saisie manuelle
-            const manualModalEl = document.getElementById('manualGPSModal');
-            if (manualModalEl) {
-                const manualModal = new bootstrap.Modal(manualModalEl);
-                manualModal.show();
-            }
-        }
-
-        // Coller depuis le presse-papiers
-        async function pasteFromClipboard() {
-            try {
-                const text = await navigator.clipboard.readText();
-                document.getElementById('gpsCoordinates').value = text;
-            } catch (err) {
-                console.error('Impossible de lire le presse-papiers:', err);
-                showError('Impossible de coller depuis le presse-papiers. Veuillez copier manuellement les coordonnées.');
-            }
-        }
-
-        // Confirmer les coordonnées GPS manuelles
-        function confirmManualGPS() {
-            const coordinatesInput = document.getElementById('gpsCoordinates').value.trim();
-
-            // Parser les coordonnées (format: lat, lng)
-            const coordsMatch = coordinatesInput.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
-            
-            if (!coordsMatch) {
-                showError("Format de coordonnées invalide. Utilisez le format: latitude, longitude (ex: -20.9286, 55.6142)");
-                return;
-            }
-
-            const lat = parseFloat(coordsMatch[1]);
-            const lng = parseFloat(coordsMatch[2]);
-
-            // Vérifier que les coordonnées sont dans les limites de La Réunion
-            if (lat < -21.4 || lat > -20.8 || lng < 55.2 || lng > 55.9) {
-                showError("Les coordonnées ne semblent pas être pour La Réunion. Veuillez vérifier et réessayer.");
-                return;
-            }
-
-            // Si on a des données en attente, créer la commande
-            if (pendingGPSOrder) {
-                addOrder(
-                    pendingGPSOrder.customerName,
-                    pendingGPSOrder.address,
-                    lat,
-                    lng,
-                    pendingGPSOrder.phone,
-                    pendingGPSOrder.priority
-                );
-
-                // Réinitialiser
-                pendingGPSOrder = null;
-                document.getElementById('addOrderForm').reset();
-                document.getElementById('gpsCoordinates').value = '';
-
-                // Fermer la modal
-                const modalEl = document.getElementById('manualGPSModal');
-                if (modalEl) {
-                    const modal = bootstrap.Modal.getInstance(modalEl);
-                    modal.hide();
-                }
-            }
-        }
-
-        // ======================
-        // FONCTIONS DE GÉOCODAGE AVEC GOOGLE MAPS API
-        // ======================
-
-        // Rechercher une adresse via Google Maps Geocoding API
-        async function searchAddressWithGoogle(query) {
-            if (!query || query.length < 3) return [];
-
-            try {
-                // Ajouter "La Réunion" à la requête pour restreindre la recherche
-                const fullQuery = query + ', La Réunion';
-                const encodedQuery = encodeURIComponent(fullQuery);
-                
-                const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedQuery}&key=${GOOGLE_MAPS_API_KEY}`;
-                const response = await fetch(url);
-                const data = await response.json();
-
-                if (data.status === 'OK' && data.results && data.results.length > 0) {
-                    // Retourner les résultats avec formatage
-                    return data.results.map(result => ({
-                        address: result.formatted_address,
-                        lat: result.geometry.location.lat,
-                        lng: result.geometry.location.lng,
-                        place_id: result.place_id
-                    }));
-                }
-                return [];
-            } catch (error) {
-                console.error("Erreur Google Geocoding:", error);
-                // Fallback sur Nominatim si Google échoue
-                return await searchAddress(query);
-            }
-        }
-
-        // Fonction pour obtenir les coordonnées d'une adresse spécifique
-        async function getCoordinatesFromGoogle(address) {
-            const results = await searchAddressWithGoogle(address);
-            if (results.length > 0) {
-                return {
-                    lat: results[0].lat,
-                    lng: results[0].lng,
-                    address: results[0].address
-                };
-            }
-            return null;
-        }
-
-        // ======================
-        // FONCTIONS DE ROUTAGE AVEC OSRM (OpenStreetMap Routing Machine)
-        // ======================
-
-        // Calculer la distance et la durée entre deux points via OSRM
-        async function getRouteDistance(lat1, lng1, lat2, lng2) {
-            try {
-                // Utiliser l'API OSRM (demo server)
-                const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`;
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                    return {
-                        distance: data.routes[0].distance, // en mètres
-                        duration: data.routes[0].duration // en secondes
-                    };
-                }
-                return null;
-            } catch (error) {
-                console.error("Erreur OSRM:", error);
-                // Retourner une estimation basée sur la distance à vol d'oiseau
-                const dx = lng2 - lng1;
-                const dy = lat2 - lat1;
-                const distance = Math.sqrt(dx * dx + dy * dy) * 111320; // ~111km par degré
-                return { distance, duration: distance / 13.89 }; // ~50km/h estimation
-            }
-        }
-
-        // Calculer la matrice de distances entre plusieurs points
-        async function calculateDistanceMatrix(points) {
-            const matrix = [];
-            
-            for (let i = 0; i < points.length; i++) {
-                matrix[i] = [];
-                for (let j = 0; j < points.length; j++) {
-                    if (i === j) {
-                        matrix[i][j] = { distance: 0, duration: 0 };
-                    } else {
-                        const result = await getRouteDistance(
-                            points[i].lat, points[i].lng,
-                            points[j].lat, points[j].lng
-                        );
-                        matrix[i][j] = result || { distance: 0, duration: 0 };
-                    }
-                }
-            }
-            
-            return matrix;
-        }
-
-        // Optimiser la tournée en tenant compte des routes réelles (algorithme du voyageur de commerce simplifié)
-        async function optimizeRouteWithRealRoutes(pharmacy, orders) {
-            if (orders.length === 0) return [];
-            
-            // Créer la liste des points (pharmacie + commandes)
-            const allPoints = [
-                { id: 'pharmacy', lat: pharmacy.lat, lng: pharmacy.lng, isPharmacy: true },
-                ...orders.map(order => ({ 
-                    id: order.id, 
-                    lat: order.lat, 
-                    lng: order.lng, 
-                    isPharmacy: false,
-                    order: order
-                }))
-            ];
-            
-            // Calculer la matrice de distances
-            const distanceMatrix = await calculateDistanceMatrix(allPoints);
-            
-            // Algorithme du plus proche voisin avec distances réelles
-            const optimizedRoute = [];
-            let currentIndex = 0; // Commencer par la pharmacie
-            const visited = new Set();
-            visited.add(0); // Marquer la pharmacie comme visitée
-            
-            while (visited.size < allPoints.length) {
-                let nearestIndex = -1;
-                let minDistance = Infinity;
-                
-                for (let j = 0; j < allPoints.length; j++) {
-                    if (!visited.has(j)) {
-                        const dist = distanceMatrix[currentIndex][j].distance;
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            nearestIndex = j;
-                        }
-                    }
-                }
-                
-                if (nearestIndex !== -1) {
-                    optimizedRoute.push(allPoints[nearestIndex]);
-                    visited.add(nearestIndex);
-                    currentIndex = nearestIndex;
-                }
-            }
-            
-            // Retourner uniquement les commandes (sans la pharmacie) dans l'ordre optimisé
-            return optimizedRoute
-                .filter(point => !point.isPharmacy)
-                .map(point => point.order);
-        }
-
-        // Calculer la distance totale et la durée de la tournée
-        async function calculateRouteStats(pharmacy, route) {
-            if (route.length === 0) {
-                return { totalDistance: 0, totalDuration: 0, steps: [] };
-            }
-            
-            const allPoints = [
-                { lat: pharmacy.lat, lng: pharmacy.lng, name: pharmacy.name },
-                ...route.map(order => ({ lat: order.lat, lng: order.lng, name: order.customerName }))
-            ];
-            
-            let totalDistance = 0;
-            let totalDuration = 0;
-            const steps = [];
-            
-            for (let i = 0; i < allPoints.length - 1; i++) {
-                const result = await getRouteDistance(
-                    allPoints[i].lat, allPoints[i].lng,
-                    allPoints[i + 1].lat, allPoints[i + 1].lng
-                );
-                
-                const distance = result ? result.distance : 0;
-                const duration = result ? result.duration : 0;
-                
-                totalDistance += distance;
-                totalDuration += duration;
-                
-                steps.push({
-                    from: allPoints[i].name,
-                    to: allPoints[i + 1].name,
-                    distance: distance,
-                    duration: duration
-                });
-            }
-            
-            return {
-                totalDistance: Math.round(totalDistance / 1000 * 10) / 10, // en km
-                totalDuration: Math.round(totalDuration / 60), // en minutes
-                steps: steps
-            };
-        }
-
-        // ======================
-        // FONCTIONS POUR L'AUTOCOMPLÉTION DES CLIENTS
-        // ======================
-
-        // Récupérer tous les clients uniques depuis les commandes
-        function getAllCustomers() {
-            const customers = [];
-            const customerMap = new Map();
-            
-            orders.forEach(order => {
-                if (!customerMap.has(order.customerName.toLowerCase())) {
-                    customerMap.set(order.customerName.toLowerCase(), {
-                        name: order.customerName,
-                        address: order.address,
-                        lat: order.lat,
-                        lng: order.lng,
-                        phone: order.phone
-                    });
-                }
-            });
-            
-            return Array.from(customerMap.values());
-        }
-
-        // Rechercher des clients par nom
-        function searchCustomers(query) {
-            if (!query || query.length < 2) return [];
-            
-            const allCustomers = getAllCustomers();
-            const lowerQuery = query.toLowerCase();
-            
-            return allCustomers.filter(customer =>
-                customer.name.toLowerCase().includes(lowerQuery)
-            );
-        }
-
-        // Afficher les suggestions de clients
-        function showCustomerSuggestions(suggestions) {
-            const container = document.getElementById('customerSuggestions');
-            if (!container) return;
-
-            if (suggestions.length === 0) {
-                container.style.display = 'none';
-                return;
-            }
-
-            container.innerHTML = suggestions.map(customer => {
-                const escapedName = customer.name.replace(/'/g, "\'");
-                const escapedAddress = customer.address.replace(/'/g, "\'");
-                return `
-                    <div class="list-group-item" onclick="selectCustomer('${escapedName}', '${escapedAddress}', ${customer.lat}, ${customer.lng}, '${customer.phone || ''}')">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>${customer.name}</strong>
-                                <div class="small text-muted">${customer.address}</div>
-                            </div>
-                            <i class="fas fa-user-check text-primary"></i>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            container.style.display = 'block';
-        }
-
-        // Sélectionner un client de la liste
-        function selectCustomer(name, address, lat, lng, phone) {
-            document.getElementById('customerName').value = name;
-            document.getElementById('address').value = address;
-            document.getElementById('phone').value = phone || '';
-            document.getElementById('customerSuggestions').style.display = 'none';
-            document.getElementById('addressSuggestions').style.display = 'none';
-        }
-
-        // ======================
-        // FONCTIONS MOBILE
-        // ======================
-
-        // Toggle menu mobile
-        function toggleMobileMenu() {
-            const sidebar = document.querySelector('.sidebar');
-            const overlay = document.getElementById('menuOverlay');
-            const toggleBtn = document.getElementById('menuToggle');
-            
-            if (sidebar && overlay) {
-                sidebar.classList.toggle('open');
-                overlay.classList.toggle('active');
-                
-                // Changer l'icône du bouton
-                if (sidebar.classList.contains('open')) {
-                    toggleBtn.innerHTML = '<i class="fas fa-times"></i>';
-                } else {
-                    toggleBtn.innerHTML = '<i class="fas fa-bars"></i>';
-                }
-            }
-        }
-
-        // Fermer le menu quand on clique sur l'overlay
-        function closeMobileMenuOnOverlayClick() {
-            const overlay = document.getElementById('menuOverlay');
-            const sidebar = document.querySelector('.sidebar');
-            const toggleBtn = document.getElementById('menuToggle');
-            
-            if (overlay) {
-                overlay.addEventListener('click', () => {
-                    if (sidebar) sidebar.classList.remove('open');
-                    if (overlay) overlay.classList.remove('active');
-                    if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-bars"></i>';
-                });
-            }
-        }
-
-        // Optimisation pour mobile : masquer le clavier quand on clique en dehors
-        function setupMobileKeyboardHandling() {
-            // Masquer le clavier quand on clique en dehors des champs
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('input') && !e.target.closest('textarea')) {
-                    // Masquer le clavier sur mobile
-                    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                        document.activeElement.blur();
-                    }
-                }
-            });
-        }
-
-        // Détecter si c'est un appareil mobile
-        function isMobileDevice() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        }
-
-        // Optimisation des touches tactiles
-        function setupTouchOptimizations() {
-            // Ajouter un effet de feedback visuel sur les boutons
-            const buttons = document.querySelectorAll('.btn, .list-group-item, .order-card, .step-item');
-            buttons.forEach(btn => {
-                btn.addEventListener('touchstart', function() {
-                    this.style.transform = 'scale(0.98)';
-                    this.style.transition = 'transform 0.1s ease';
-                });
-                
-                btn.addEventListener('touchend', function() {
-                    this.style.transform = '';
-                });
-                
-                btn.addEventListener('touchcancel', function() {
-                    this.style.transform = '';
-                });
-            });
-        }
-
-        // Gestion du scroll sur mobile
-        function setupMobileScroll() {
-            // Désactiver le scroll horizontal
-            document.addEventListener('touchmove', function(e) {
-                if (Math.abs(e.touches[0].clientX - e.touches[0].pageX) > 10) {
-                    e.preventDefault();
-                }
-            }, { passive: false });
-        }
-
-        // ======================
-        // INITIALISATION
-        // ======================
-        document.addEventListener('DOMContentLoaded', () => {
-            initMap();
-            checkMapUpdate(); // Vérifier si la carte doit être mise à jour
-            renderOrders();
-            
-            // Initialiser le menu mobile
-            const menuToggle = document.getElementById('menuToggle');
-            if (menuToggle) {
-                menuToggle.addEventListener('click', toggleMobileMenu);
-            }
-            
-            // Fermer le menu quand on clique sur l'overlay
-            closeMobileMenuOnOverlayClick();
-            
-            // Optimisations mobiles
-            setupMobileKeyboardHandling();
-            setupTouchOptimizations();
-            
-            // Initialiser la carte en mode mobile si nécessaire
-            if (isMobileDevice()) {
-                setupMobileScroll();
-            }
-            
-            // Bouton flottant pour optimiser (mobile)
-            const optimizeFloatingBtn = document.getElementById('optimizeFloatingBtn');
-            if (optimizeFloatingBtn) {
-                optimizeFloatingBtn.addEventListener('click', optimizeRoute);
-            }
-
-            // Formulaire d'ajout de commande
-            const addOrderForm = document.getElementById('addOrderForm');
-            if (!addOrderForm) return;
-
-            addOrderForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const customerName = document.getElementById('customerName').value.trim();
-                const address = document.getElementById('address').value.trim();
-                const phone = document.getElementById('phone').value.trim();
-                const priority = document.getElementById('priority').checked ? 1 : 0;
-
-                if (!customerName || !address) {
-                    showError("Veuillez remplir tous les champs obligatoires.");
-                    return;
-                }
-
-                // Rechercher l'adresse (utilise Google Maps en priorité)
-                const suggestions = await searchAddress(address);
-
-                if (suggestions.length > 0) {
-                    // Si on a des suggestions, utiliser la première
-                    addOrder(customerName, suggestions[0].address, suggestions[0].lat, suggestions[0].lng, phone, priority);
-                } else {
-                    // Essayer une recherche plus large avec Google Maps
-                    const googleResult = await searchAddressWithGoogleAndFallback(address);
-                    if (googleResult) {
-                        addOrder(customerName, googleResult.address, googleResult.lat, googleResult.lng, phone, priority);
-                    } else {
-                        // Sinon, proposer les adresses proches des commandes existantes
-                        const closestFromOrders = findClosestFromOrders(pharmacy.lat, pharmacy.lng);
-
-                        if (closestFromOrders) {
-                            showClosestAddresses([closestFromOrders], address);
-                            return;
-                        } else {
-                            // Ouvrir automatiquement la modal pour entrer manuellement
-                            showManualGPSModal();
-                            return;
-                        }
-                    }
-                }
-
-                addOrderForm.reset();
-                document.getElementById('addressSuggestions').style.display = 'none';
-            });
-
-            // Autocomplétion des adresses (restreinte à La Réunion)
-            const addressInput = document.getElementById('address');
-            if (!addressInput) return;
-
-            addressInput.addEventListener('input', async (e) => {
-                const query = e.target.value.trim();
-                if (query.length < 3) {
-                    document.getElementById('addressSuggestions').style.display = 'none';
-                    return;
-                }
-
-                const suggestions = await searchAddress(query);
-                const container = document.getElementById('addressSuggestions');
-
-                if (!container) return;
-
-                if (suggestions.length > 0) {
-                    container.innerHTML = suggestions.map(s => {
-                        const escapedAddress = s.address.replace(/'/g, "\\'");
-                        return `
-                            <div class="list-group-item" onclick="selectAddress('${escapedAddress}', ${s.lat}, ${s.lng})">
-                                ${s.address}
-                            </div>
-                        `;
-                    }).join('');
-                    container.style.display = 'block';
-                } else {
-                    container.style.display = 'none';
-                }
-            });
-
-            // Optimiser la tournée
-            const optimizeBtn = document.getElementById('optimizeRouteBtn');
-            if (!optimizeBtn) return;
-
-            optimizeBtn.addEventListener('click', optimizeRoute);
-
-            // Masquer les suggestions en cliquant ailleurs
-            document.addEventListener('click', (e) => {
-                const addressSuggestions = document.getElementById('addressSuggestions');
-                const customerSuggestions = document.getElementById('customerSuggestions');
-                
-                if (addressSuggestions && !e.target.closest('#address') && !e.target.closest('#addressSuggestions')) {
-                    addressSuggestions.style.display = 'none';
-                }
-                
-                if (customerSuggestions && !e.target.closest('#customerName') && !e.target.closest('#customerSuggestions')) {
-                    customerSuggestions.style.display = 'none';
-                }
-            });
-        });
-    </script>
-    <!-- Bouton flottant pour optimiser la tournée (mobile) -->
-    <button class="floating-action-button" id="optimizeFloatingBtn" title="Optimiser la tournée">
-        <i class="fas fa-route"></i>
-    </button>
-    <!-- Enregistrement du Service Worker pour PWA -->
+    
+    <!-- Nos scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/geocoding.js"></script>
+    <script src="js/routing.js"></script>
+    <script src="js/app.js"></script>
+    
+    <!-- Service Worker -->
     <script>
         // Enregistrer le Service Worker
         if ('serviceWorker' in navigator) {
@@ -1923,17 +577,13 @@
                     .then(registration => {
                         console.log('ServiceWorker registration successful');
                         
-                        // Mettre à jour le Service Worker si une nouvelle version est disponible
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             installingWorker.onstatechange = () => {
                                 if (installingWorker.state === 'installed') {
                                     if (navigator.serviceWorker.controller) {
-                                        // Nouvelle version disponible
-                                        console.log('Nouvelle version de l'application disponible');
-                                        // Vous pouvez afficher une notification à l'utilisateur
+                                        console.log('Nouvelle version de l\'application disponible');
                                     } else {
-                                        // Première installation
                                         console.log('Application prête pour fonctionner hors ligne');
                                     }
                                 }
@@ -1946,32 +596,20 @@
             });
         }
         
-        // Détecter si l'application est installée comme PWA
+        // Détecter si l'application peut être installée
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
-            // Prévenir l'affichage automatique du prompt
             e.preventDefault();
-            // Stocker l'événement pour plus tard
             deferredPrompt = e;
             
-            // Vous pouvez afficher un bouton "Installer" dans votre UI
+            // Afficher le bouton d'installation
+            const installBtn = document.getElementById('installAppBtn');
+            if (installBtn) {
+                installBtn.style.display = 'block';
+            }
+            
             console.log('Application peut être installée comme PWA');
         });
-        
-        // Fonction pour déclencher l'installation
-        function showInstallPrompt() {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('Utilisateur a accepté l'installation');
-                    } else {
-                        console.log('Utilisateur a refusé l'installation');
-                    }
-                    deferredPrompt = null;
-                });
-            }
-        }
         
         // Vérifier si l'application est déjà installée
         window.addEventListener('appinstalled', (evt) => {
@@ -1988,14 +626,26 @@
             e.preventDefault();
             deferredPrompt = e;
             
-            // Afficher le bouton d'installation
             const installBtn = document.getElementById('installAppBtn');
             if (installBtn) {
                 installBtn.style.display = 'block';
             }
-            
-            console.log('Application peut être installée comme PWA');
         });
+        
+        // Fonction pour déclencher l'installation
+        function showInstallPrompt() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('Utilisateur a accepté l\'installation');
+                    } else {
+                        console.log('Utilisateur a refusé l\'installation');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        }
     </script>
 </body>
 </html>
