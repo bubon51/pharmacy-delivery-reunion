@@ -62,7 +62,7 @@
         #addressSuggestions .list-group-item:hover {
             background-color: #f8f9fa;
         }
-        .btn-waze {
+        .btn-google-maps {
             background-color: #0073ff;
             color: white;
             border: none;
@@ -71,7 +71,7 @@
             cursor: pointer;
             font-size: 0.8rem;
         }
-        .btn-waze:hover {
+        .btn-google-maps:hover {
             background-color: #0056d3;
         }
         .step-item {
@@ -115,11 +115,11 @@
         #gpsCoordinates {
             font-family: monospace;
         }
-        .btn-waze-search {
+        .btn-google-maps-search {
             background-color: #0073ff;
             color: white;
         }
-        .btn-waze-search:hover {
+        .btn-google-maps-search:hover {
             background-color: #0056d3;
         }
 
@@ -167,6 +167,27 @@
         }
         #customerSuggestions .list-group-item:last-child {
             border-bottom: none;
+        }
+
+        /* Style pour les boutons Google Maps */
+        .btn-google-maps {
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .btn-google-maps:hover {
+            background-color: #3367D6;
+        }
+        .btn-google-maps-search {
+            background-color: #4285F4;
+            color: white;
+        }
+        .btn-google-maps-search:hover {
+            background-color: #3367D6;
         }
 </style>
 </head>
@@ -267,8 +288,8 @@
                     <div id="closestAddressOptions" class="list-group"></div>
                     <div class="mt-3 text-center">
                         <p class="mb-2">Ou</p>
-                        <button type="button" class="btn btn-primary btn-lg" onclick="openWazeForSearch()">
-                            <i class="fas fa-search"></i> Chercher sur Waze
+                        <button type="button" class="btn btn-primary btn-lg" onclick="openGoogleMapsForSearch()">
+                            <i class="fas fa-search"></i> Chercher sur Google Maps
                         </button>
                         <div class="mt-2">
                             <button type="button" class="btn btn-info" onclick="showManualGPSModal()">
@@ -297,11 +318,11 @@
                 <div class="modal-body">
                     <div class="alert alert-info mb-3">
                         <i class="fas fa-info-circle"></i> 
-                        <strong>Comment obtenir les coordonnées depuis Waze :</strong>
+                        <strong>Comment obtenir les coordonnées depuis Google Maps :</strong>
                         <ol class="mb-0 mt-2">
-                            <li>Cherchez votre adresse sur Waze</li>
-                            <li>Dans l'URL, repérez <code class="bg-light px-2 py-1 rounded">ll=-20.9286,55.6142</code></li>
-                            <li>Copiez les valeurs après <code>ll=</code></li>
+                            <li>Cherchez votre adresse sur Google Maps</li>
+                            <li>Faites un clic droit sur l'emplacement et sélectionnez "Copier les coordonnées du lieu"</li>
+                            <li>Ou repérez les coordonnées dans l'URL (format: @-20.9286,55.6142)</li>
                             <li>Collez-les ici au format : <code>-20.9286, 55.6142</code></li>
                         </ol>
                     </div>
@@ -487,8 +508,8 @@
                     .bindPopup(`
                         <b>${index+1}. ${order.customerName}</b><br>
                         ${order.address}<br>
-                        <button onclick="openWaze(${order.lat}, ${order.lng})" class="btn-waze mt-2">
-                            <i class="fas fa-directions"></i> Naviguer avec Waze
+                        <button onclick="openGoogleMaps(${order.lat}, ${order.lng})" class="btn-google-maps mt-2">
+                            <i class="fas fa-directions"></i> Naviguer avec Google Maps
                         </button>
                     `);
                 markers.push(marker);
@@ -655,8 +676,8 @@
                                 <small>${pharmacy.address}</small>
                             </div>
                         </div>
-                        <button class="btn-waze" onclick="openWaze(${pharmacy.lat}, ${pharmacy.lng})">
-                            <i class="fas fa-directions"></i> Waze
+                        <button class="btn-google-maps" onclick="openGoogleMaps(${pharmacy.lat}, ${pharmacy.lng})">
+                            <i class="fas fa-directions"></i> Google Maps
                         </button>
                     </div>
                     ${orders.map((order, index) => {
@@ -670,8 +691,8 @@
                                         <small>${order.address}</small>
                                     </div>
                                 </div>
-                                <button class="btn-waze" onclick="openWaze(${order.lat}, ${order.lng})">
-                                    <i class="fas fa-directions"></i> Waze
+                                <button class="btn-google-maps" onclick="openGoogleMaps(${order.lat}, ${order.lng})">
+                                    <i class="fas fa-directions"></i> Google Maps
                                 </button>
                             </div>
                         `;
@@ -792,23 +813,23 @@
             }
         }
 
-        // Ouvrir Waze avec les coordonnées et les copier dans le presse-papiers
-        async function openWaze(lat, lng) {
+        // Ouvrir Google Maps avec les coordonnées et les copier dans le presse-papiers
+        async function openGoogleMaps(lat, lng) {
             try {
                 // Copier les coordonnées dans le presse-papiers
                 const coordsText = `${lat}, ${lng}`;
                 await navigator.clipboard.writeText(coordsText);
                 
-                // Ouvrir Waze avec les coordonnées
-                window.open(`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
+                // Ouvrir Google Maps avec les coordonnées
+                window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
                 
                 // Afficher une confirmation
-                showError(`Coordonnées copiées: ${coordsText}. Waze s'ouvre avec ces coordonnées.`);
+                showError(`Coordonnées copiées: ${coordsText}. Google Maps s'ouvre avec ces coordonnées.`);
             } catch (err) {
                 console.error('Impossible de copier dans le presse-papiers:', err);
-                // Ouvrir Waze quand même
-                window.open(`https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
-                showError('Waze ouvert. Copiez manuellement les coordonnées si nécessaire.');
+                // Ouvrir Google Maps quand même
+                window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+                showError('Google Maps ouvert. Copiez manuellement les coordonnées si nécessaire.');
             }
         }
 
@@ -920,14 +941,14 @@
         }
 
         // ======================
-        // FONCTIONS POUR WAZE ET GPS MANUEL
+        // FONCTIONS POUR GOOGLE MAPS ET GPS MANUEL
         // ======================
         
         // Variable pour stocker les données en attente de coordonnées GPS
         let pendingGPSOrder = null;
 
-        // Ouvrir Waze avec l'adresse pré-remplie dans la recherche
-        function openWazeForSearch() {
+        // Ouvrir Google Maps avec l'adresse pré-remplie dans la recherche
+        function openGoogleMapsForSearch() {
             // Stocker les données du formulaire en attente
             const customerName = document.getElementById('customerName').value.trim();
             const address = document.getElementById('address').value.trim();
@@ -952,10 +973,10 @@
                 priority: priority
             };
 
-            // Ouvrir Waze avec l'adresse pré-remplie dans le champ de recherche
-            // Format: https://www.waze.com/ul?q=<adresse_encodée>&navigate=yes
+            // Ouvrir Google Maps avec l'adresse pré-remplie dans le champ de recherche
+            // Format: https://www.google.com/maps/search/?api=1&query=<adresse_encodée>
             const encodedAddress = encodeURIComponent(address + ', La Réunion');
-            window.open(`https://www.waze.com/ul?q=${encodedAddress}&navigate=yes`, '_blank');
+            window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
 
             // Fermer la modal actuelle
             const modalEl = document.getElementById('closestAddressModal');
@@ -965,7 +986,7 @@
             }
 
             // Afficher un message pour guider l'utilisateur
-            showError("Waze s'ouvre avec votre adresse pré-remplie. Une fois l'adresse trouvée, copiez les coordonnées GPS depuis l'URL de Waze (format: ll=LATITUDE,LONGITUDE) et collez-les dans la fenêtre de saisie manuelle.");
+            showError("Google Maps s'ouvre avec votre adresse pré-remplie. Une fois l'adresse trouvée, copiez les coordonnées GPS depuis Google Maps et collez-les dans la fenêtre de saisie manuelle.");
         }
 
         // Afficher la modal pour la saisie manuelle des coordonnées GPS
@@ -1321,7 +1342,7 @@
                         showClosestAddresses([closestFromOrders], address);
                         return;
                     } else {
-                        // Ouvrir automatiquement la modal pour chercher sur Waze ou entrer manuellement
+                        // Ouvrir automatiquement la modal pour chercher sur Google Maps ou entrer manuellement
                         showManualGPSModal();
                         return;
                     }
