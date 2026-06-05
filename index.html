@@ -574,19 +574,8 @@
     <script src="js/map.js"></script>
     <script src="js/app.js"></script>
     
-    <!-- Google Maps API avec callback -->
-    <script>
-        // Fonction callback pour Google Maps API
-        window.googleMapsCallback = function() {
-            console.log('Google Maps API chargée');
-            // Initialiser la carte
-            if (typeof initMap === 'function') {
-                initMap();
-                updateMap();
-            }
-        };
-    </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc&libraries=places,geometry&callback=googleMapsCallback" async defer></script>
+    <!-- Google Maps API - chargée sans callback, l'initialisation se fait dans app.js -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc&libraries=places,geometry"></script>
     
     <!-- Service Worker -->
     <script>

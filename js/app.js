@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.orders = loadOrders() || [];
     console.log('Commandes chargées:', window.orders);
     
-    // Initialiser l'application (sans la carte, qui sera initialisée par le callback Google Maps)
+    // Initialiser l'application (sans la carte)
     renderOrders();
     setupEventListeners();
     
@@ -28,12 +28,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Mettre à jour la date de dernière mise à jour
     updateLastUpdatedDate();
     
-    // Vérifier si Google Maps est déjà chargé (pour le développement local)
-    if (typeof google !== 'undefined' && google.maps) {
-        console.log('Google Maps déjà chargé, initialisation de la carte');
-        initMap();
-        updateMap();
+    // Initialiser la carte quand Google Maps API est prête
+    function checkGoogleMaps() {
+        if (typeof google !== 'undefined' && google.maps && typeof initMap === 'function') {
+            console.log('Google Maps API est prête, initialisation de la carte');
+            initMap();
+            updateMap();
+        } else {
+            setTimeout(checkGoogleMaps, 200);
+        }
     }
+    
+    // Démarrer la vérification
+    checkGoogleMaps();
 });
 
 function updateLastUpdatedDate() {
