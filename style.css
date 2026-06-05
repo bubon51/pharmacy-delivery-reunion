@@ -1,4 +1,3 @@
-/* Styles généraux */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
@@ -21,7 +20,6 @@ body {
 #map {
     height: calc(100vh - 60px);
     width: 100%;
-    z-index: 1;
 }
 
 .route-steps {
@@ -29,17 +27,11 @@ body {
     bottom: 20px;
     left: 20px;
     right: 20px;
-    background-color: white;
+    background: white;
     padding: 15px;
     border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     max-height: 300px;
-    overflow-y: auto;
-}
-
-.orders-container {
-    max-height: 400px;
     overflow-y: auto;
 }
 
@@ -47,12 +39,6 @@ body {
     margin-bottom: 10px;
     border-left: 4px solid #0d6efd;
     cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.order-card:hover {
-    transform: translateX(5px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .order-card.urgent {
@@ -61,16 +47,6 @@ body {
 
 .order-card .card-body {
     padding: 10px;
-}
-
-.order-card .card-title {
-    font-size: 1rem;
-    margin-bottom: 5px;
-}
-
-.order-card .card-text {
-    font-size: 0.9rem;
-    color: #6c757d;
 }
 
 #addressSuggestions .list-group-item {
@@ -105,10 +81,6 @@ body {
     align-items: center;
 }
 
-.step-item:last-child {
-    border-bottom: none;
-}
-
 .step-number {
     background-color: #0d6efd;
     color: white;
@@ -122,19 +94,13 @@ body {
     margin-right: 10px;
 }
 
-.modal-content {
-    border-radius: 8px;
-}
-
 @media (max-width: 768px) {
     .sidebar {
         height: auto;
     }
-
     #map {
         height: 400px;
     }
-
     .route-steps {
         position: relative;
         margin-top: 20px;
