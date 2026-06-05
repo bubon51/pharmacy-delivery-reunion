@@ -577,6 +577,10 @@
     <!-- Google Maps API - chargée sans callback, l'initialisation se fait dans app.js -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc&libraries=places,geometry"></script>
     
+    <!-- Fallback : Leaflet + OpenStreetMap si Google Maps échoue -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <!-- Service Worker -->
     <script>
         // Enregistrer le Service Worker
