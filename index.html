@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#17a2b8">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Pharmacy Delivery Réunion</title>
@@ -579,8 +580,8 @@
     <!-- Leaflet JS pour le fallback -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <!-- Google Maps API -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc&libraries=places,geometry"></script>
+    <!-- Google Maps API avec chargement asynchrone optimisé et bibliothèque marker -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc&libraries=places,geometry,marker&loading=async"></script>
     
     <!-- Service Worker -->
     <script>
