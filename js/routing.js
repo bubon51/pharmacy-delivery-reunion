@@ -45,18 +45,25 @@ async function getRouteDistanceWithOSRM(lat1, lng1, lat2, lng2) {
 }
 
 // Calculer la distance et la durée entre deux points
-// Priorité: Google Maps Directions > OSRM > calcul à vol d'oiseau
+// Priorité: OSRM > Google Maps Directions (désactivé à cause de CORS) > calcul à vol d'oiseau
+// Note: Google Maps Directions API ne fonctionne pas depuis le navigateur à cause de CORS
+// On utilise donc OSRM en priorité, qui fonctionne sans problème CORS
 async function getRouteDistance(lat1, lng1, lat2, lng2, apiKey) {
-    // Essayer d'abord avec Google Maps Directions (plus précis pour La Réunion)
-    const googleResult = await getRouteDistanceWithGoogle(lat1, lng1, lat2, lng2, apiKey);
-    if (googleResult) {
-        return googleResult;
-    }
-    
-    // Fallback sur OSRM
+    // Essayer d'abord avec OSRM (fonctionne sans CORS)
     const osrmResult = await getRouteDistanceWithOSRM(lat1, lng1, lat2, lng2);
     if (osrmResult) {
         return osrmResult;
+    }
+    
+    // Essayer avec Google Maps Directions via un proxy CORS (si disponible)
+    // Note: Cela peut échouer à cause de CORS, donc on ne bloque pas l'exécution
+    try {
+        const googleResult = await getRouteDistanceWithGoogle(lat1, lng1, lat2, lng2, apiKey);
+        if (googleResult) {
+            return googleResult;
+        }
+    } catch (error) {
+        console.warn("Google Maps Directions non disponible (CORS), utilisation de OSRM");
     }
     
     // Fallback final: estimation basée sur la distance à vol d'oiseau

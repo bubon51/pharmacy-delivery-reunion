@@ -569,19 +569,34 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
+    <!-- Leaflet JS pour le fallback -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <!-- Nos scripts -->
     <script src="js/config.js"></script>
     <script src="js/data.js"></script>
     <script src="js/geocoding.js"></script>
     <script src="js/routing.js"></script>
     <script src="js/map.js"></script>
+    
+    <!-- Google Maps API avec callback pour s'assurer qu'elle est chargée avant utilisation -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc&libraries=places,geometry,marker&callback=initGoogleMapsCallback"></script>
+    
+    <!-- Script pour gérer le callback de Google Maps -->
+    <script>
+        // Fonction de callback appelée quand Google Maps API est prête
+        function initGoogleMapsCallback() {
+            console.log('Google Maps API chargée avec succès via callback');
+            window.googleMapsReady = true;
+            // Si initMap existe déjà, l'appeler
+            if (typeof initMap === 'function') {
+                initMap();
+                if (typeof updateMap === 'function') updateMap();
+            }
+        }
+    </script>
+    
     <script src="js/app.js"></script>
-    
-    <!-- Leaflet JS pour le fallback -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- Google Maps API avec chargement asynchrone optimisé et bibliothèque marker -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCB0pbjbeibF0-axu9b3EbOGn8M0U7p0mc&libraries=places,geometry,marker&loading=async"></script>
     
     <!-- Service Worker -->
     <script>

@@ -28,28 +28,35 @@ document.addEventListener('DOMContentLoaded', () => {
     // Mettre à jour la date de dernière mise à jour
     updateLastUpdatedDate();
     
-    // Initialiser la carte quand Google Maps API est prête
-    let googleMapsCheckCount = 0;
-    const MAX_GOOGLE_MAPS_CHECKS = 50; // 10 secondes max (200ms * 50)
-    function checkGoogleMaps() {
-        googleMapsCheckCount++;
-        if (typeof google !== 'undefined' && google.maps && typeof initMap === 'function') {
+    // Initialiser la carte
+    // Google Maps API sera initialisée via le callback dans index.html
+    // Si Google Maps échoue, on utilise le fallback Leaflet après un délai
+    let googleMapsInitialized = false;
+    
+    // Vérifier si Google Maps est disponible (appelé via callback ou timeout)
+    function tryInitMap() {
+        if (typeof google !== 'undefined' && google.maps && typeof initMap === 'function' && !googleMapsInitialized) {
+            googleMapsInitialized = true;
             console.log('Google Maps API est prête, initialisation de la carte');
             initMap();
             updateMap();
-        } else if (typeof L !== 'undefined' && googleMapsCheckCount >= MAX_GOOGLE_MAPS_CHECKS) {
+        } else if (typeof L !== 'undefined' && !googleMapsInitialized) {
+            googleMapsInitialized = true;
             console.log('Google Maps API non disponible, utilisation du fallback Leaflet');
             initMap();
             updateMap();
-        } else if (googleMapsCheckCount < MAX_GOOGLE_MAPS_CHECKS) {
-            setTimeout(checkGoogleMaps, 200);
-        } else {
-            console.error('Aucune bibliothèque de carte disponible');
         }
     }
     
-    // Démarrer la vérification
-    checkGoogleMaps();
+    // Si Google Maps n'est pas chargé après 3 secondes, essayer Leaflet
+    setTimeout(() => {
+        if (!googleMapsInitialized) {
+            tryInitMap();
+        }
+    }, 3000);
+    
+    // Essayer immédiatement au cas où Google Maps serait déjà chargé
+    tryInitMap();
 });
 
 function updateLastUpdatedDate() {
@@ -422,11 +429,13 @@ function showManualGPSModal() {
     // Vider le champ de coordonnées
     document.getElementById('gpsCoordinates').value = '';
 
-    // Fermer la modal actuelle
+    // Fermer la modal actuelle si elle est ouverte
     const closestModalEl = document.getElementById('closestAddressModal');
     if (closestModalEl) {
         const closestModal = bootstrap.Modal.getInstance(closestModalEl);
-        closestModal.hide();
+        if (closestModal) {
+            closestModal.hide();
+        }
     }
 
     // Afficher la modal de saisie manuelle
@@ -487,7 +496,9 @@ function confirmManualGPS() {
         const modalEl = document.getElementById('manualGPSModal');
         if (modalEl) {
             const modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
+            if (modal) {
+                modal.hide();
+            }
         }
     }
 }
@@ -579,7 +590,9 @@ function selectClosestAddress(index) {
     const modalEl = document.getElementById('closestAddressModal');
     if (modalEl) {
         const modal = bootstrap.Modal.getInstance(modalEl);
-        modal.hide();
+        if (modal) {
+            modal.hide();
+        }
     }
 }
 
